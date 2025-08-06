@@ -1,105 +1,169 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Snake Game - Level 1</title>
+    <title>Snake Game - Enhanced</title>
     <style>
-        canvas {
-            background: black;
-            display: block;
-            margin: 0 auto;
-            border: 2px solid white;
-        }
         body {
-            text-align: center;
-            color: white;
-            font-family: Arial, sans-serif;
             background-color: #222;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        canvas {
+            background-color: black;
+            border: 3px solid white;
+            margin-top: 20px;
+        }
+        #controls {
+            margin-top: 20px;
+        }
+        button, select {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover, select:hover {
+            opacity: 0.9;
+        }
+        #scoreDisplay {
+            margin-top: 10px;
+            font-size: 18px;
         }
     </style>
 </head>
 <body>
-    <h1>Snake Game - Level 1</h1>
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
-    <p id="score">Score: 0</p>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+<h1>Snake Game</h1>
 
-        const box = 20; // Size of each snake part
-        let score = 0;
+<canvas id="gameCanvas" width="400" height="400"></canvas>
 
-        // Snake and Food
-        let snake = [{x: 200, y: 200}];
-        let food = {
-            x: Math.floor(Math.random() * 20) * box,
-            y: Math.floor(Math.random() * 20) * box
-        };
+<div id="controls">
+    <button onclick="startGame()">Start</button>
+    <button onclick="pauseGame()">Pause</button>
+    <button onclick="resetGame()">Reset</button>
+    <select id="speedSelect" onchange="changeSpeed(this.value)">
+        <option value="150">Slow</option>
+        <option value="100" selected>Medium</option>
+        <option value="60">Fast</option>
+    </select>
+</div>
 
-        let direction = "RIGHT";
+<div id="scoreDisplay">Score: 0</div>
 
-        document.addEventListener("keydown", changeDirection);
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-        function changeDirection(event) {
-            if (event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
-            if (event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
-            if (event.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
-            if (event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+    const box = 20;
+    let snake = [{x: 200, y: 200}];
+    let food = {x: 100, y: 100};
+    let direction = "RIGHT";
+    let score = 0;
+    let gameInterval;
+    let speed = 100;
+    let isRunning = false;
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+        if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+        if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+        if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+    });
+
+    function drawGame() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw snake
+        snake.forEach((segment, index) => {
+            ctx.fillStyle = index === 0 ? "#00FF00" : "#00AA00";
+            ctx.fillRect(segment.x, segment.y, box, box);
+        });
+
+        // Draw food
+        ctx.fillStyle = "red";
+        ctx.fillRect(food.x, food.y, box, box);
+
+        // Move snake
+        let headX = snake[0].x;
+        let headY = snake[0].y;
+
+        if (direction === "UP") headY -= box;
+        if (direction === "DOWN") headY += box;
+        if (direction === "LEFT") headX -= box;
+        if (direction === "RIGHT") headX += box;
+
+        // Check collision with wall
+        if (headX < 0 || headX >= 400 || headY < 0 || headY >= 400) {
+            gameOver();
+            return;
         }
 
-        function drawGame() {
-            ctx.clearRect(0, 0, 400, 400);
-
-            // Draw snake
-            for (let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = i === 0 ? "lime" : "green";
-                ctx.fillRect(snake[i].x, snake[i].y, box, box);
+        // Check collision with self
+        for (let i = 1; i < snake.length; i++) {
+            if (headX === snake[i].x && headY === snake[i].y) {
+                gameOver();
+                return;
             }
-
-            // Draw food
-            ctx.fillStyle = "red";
-            ctx.fillRect(food.x, food.y, box, box);
-
-            // Move snake
-            let headX = snake[0].x;
-            let headY = snake[0].y;
-
-            if (direction === "UP") headY -= box;
-            if (direction === "DOWN") headY += box;
-            if (direction === "LEFT") headX -= box;
-            if (direction === "RIGHT") headX += box;
-
-            // Check collision with wall
-            if (headX < 0 || headX >= 400 || headY < 0 || headY >= 400) {
-                alert("Game Over! Final Score: " + score);
-                document.location.reload();
-            }
-
-            // Check collision with self
-            for (let i = 1; i < snake.length; i++) {
-                if (headX === snake[i].x && headY === snake[i].y) {
-                    alert("Game Over! Final Score: " + score);
-                    document.location.reload();
-                }
-            }
-
-            // Eat food
-            if (headX === food.x && headY === food.y) {
-                score++;
-                document.getElementById("score").innerText = "Score: " + score;
-                food = {
-                    x: Math.floor(Math.random() * 20) * box,
-                    y: Math.floor(Math.random() * 20) * box
-                };
-            } else {
-                snake.pop();
-            }
-
-            let newHead = {x: headX, y: headY};
-            snake.unshift(newHead);
         }
 
-        setInterval(drawGame, 100);
-    </script>
+        // Eat food
+        if (headX === food.x && headY === food.y) {
+            score++;
+            document.getElementById("scoreDisplay").innerText = "Score: " + score;
+            food = {
+                x: Math.floor(Math.random() * 20) * box,
+                y: Math.floor(Math.random() * 20) * box
+            };
+        } else {
+            snake.pop();
+        }
+
+        snake.unshift({x: headX, y: headY});
+    }
+
+    function startGame() {
+        if (!isRunning) {
+            gameInterval = setInterval(drawGame, speed);
+            isRunning = true;
+        }
+    }
+
+    function pauseGame() {
+        clearInterval(gameInterval);
+        isRunning = false;
+    }
+
+    function resetGame() {
+        pauseGame();
+        snake = [{x: 200, y: 200}];
+        food = {x: 100, y: 100};
+        direction = "RIGHT";
+        score = 0;
+        document.getElementById("scoreDisplay").innerText = "Score: 0";
+        drawGame();
+    }
+
+    function gameOver() {
+        pauseGame();
+        alert("Game Over! Final Score: " + score);
+        resetGame();
+    }
+
+    function changeSpeed(newSpeed) {
+        speed = parseInt(newSpeed);
+        if (isRunning) {
+            pauseGame();
+            startGame();
+        }
+    }
+
+    drawGame(); // Draw initial state
+</script>
+
 </body>
 </html>
