@@ -1,504 +1,389 @@
-/* === script.js - Classic Snake Arcade (with power-ups, BFS AI, sounds) === */
+// script.js — Snake Arcade (UI + game + touch + BFS AI + sound)
 
-/* CONFIG */
+// === CONFIG & STATE ===
 const CONFIG = {
-  GRID_SIZE: 20,            // pixel size of a grid cell
-  CANVAS_SIZE: 480,        // canvas drawing size (square)
-  INITIAL_SPEED: 160,      // ms per step (lower = faster)
-  SPEED_INCREASE: 10,      // ms decrease per level
+  GRID_SIZE: 20,
+  CANVAS_SIZE: 480,
+  INITIAL_SPEED: 160,
+  SPEED_INCREASE: 10,
   POINTS_PER_FOOD: 10,
   POINTS_PER_LEVEL: 100,
-  POWERUP_SPAWN_FREQ: 12000, // ms between potential power-up spawns
-  POWERUP_DURATION: 8000,   // ms duration for temporary powerups
+  POWERUP_SPAWN_FREQ: 12000,
+  POWERUP_DURATION: 8000,
   POWERUP_TYPES: ['speed','bonus','slow']
 };
 
-/* STATE */
-let gameState = {
-  canvas: null,
-  ctx: null,
-  snake: [{x:10,y:10}],
-  aiSnake: [],
-  food: {x:15,y:15},
-  powerups: [],            // array of {x,y,type}
-  direction: {x:0,y:0},
-  score: 0,
-  level: 1,
-  highScore: 0,
-  gameRunning: false,
-  gamePaused: false,
-  gameMode: 'human', // 'human','ai','vs'
-  gameSpeed: CONFIG.INITIAL_SPEED,
-  gameLoop: null,
-  lastPowerupSpawn: 0,
-  activePower: null,      // {type, expiresAt}
-  audioCtx: null
+const app = {
+  view: 'home',
+  elements: {},
+  game: {
+    canvas:null, ctx:null,
+    snake:[{x:10,y:10}], aiSnake:[], food:{x:15,y:15}, powerups:[],
+    direction:{x:0,y:0}, score:0, level:1, highScore:0,
+    running:false, paused:false, mode:'human', speed:CONFIG.INITIAL_SPEED, loop:null,
+    lastPowerupSpawn:0, activePower:null, audioCtx:null,
+    touchStart:null, touchLast:null, touchSensitivity:40, aiDifficulty:'normal'
+  }
 };
 
-/* DOM refs */
-const elements = {
-  canvas:null, startBtn:null, pauseBtn:null, resetBtn:null,
-  scoreEl:null, highScoreEl:null, levelEl:null, gameModeEl:null,
-  gameStatus:null, gameOverModal:null, gameOverScore:null, gameOverMessage:null,
-  levelProgress:null, progressText:null, aiStatus:null, hudActive:null
-};
+// === DOM Shortcuts ===
+function $(sel){ return document.querySelector(sel) }
+function $all(sel){ return Array.from(document.querySelectorAll(sel)) }
 
-/* --- AUDIO (Web Audio procedural tones) --- */
-function ensureAudio() {
-  if (!gameState.audioCtx) {
-    gameState.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// === UI Initialization ===
+document.addEventListener('DOMContentLoaded', ()=> {
+  cacheElements();
+  wireUI();
+  loadSettings();
+  setupCanvas();
+  initGameState();
+  showView('home');
+});
+
+/* cache DOM nodes */
+function cacheElements(){
+  app.elements.views = $all('.view');
+  app.elements.playView = $('.view-play');
+  app.elements.homeView = $('.view-home');
+  app.elements.settingsView = $('.view-settings');
+  app.elements.toolsView = $('.view-tools');
+  app.elements.sideMenu = $('#sideMenu');
+  app.elements.btnMenu = $('#btnMenu');
+  app.elements.closeMenu = $('#closeMenu');
+  app.elements.menuItems = $all('.menu-item');
+  app.elements.playNow = $('#playNow');
+  app.elements.openSettings = $('#openSettings');
+  app.elements.openTools = $('#openTools');
+  app.elements.playCanvas = $('#gameCanvas');
+  app.elements.hudActive = $('#hudActive') || document.getElementById('hudActive');
+  app.elements.touchDpad = $('#touchDpad');
+  app.elements.pauseBtn = $('#pauseBtn');
+  app.elements.resetBtn = $('#resetBtn');
+  app.elements.gameStatus = $('#gameStatus');
+  app.elements.gameOverModal = $('#gameOverModal');
+  app.elements.gameOverScore = $('#gameOverScore');
+  app.elements.toggleTheme = $('#toggleTheme');
+  app.elements.themeLight = $('#themeLight');
+  app.elements.themeDark = $('#themeDark');
+  app.elements.touchSensitivity = $('#touchSensitivity');
+  app.elements.saveSettings = $('#saveSettings');
+  app.elements.cancelSettings = $('#cancelSettings');
+  app.elements.aiDifficulty = $('#aiDifficulty');
+  app.elements.playButton = $('#playNow');
+}
+
+/* Wire UI events */
+function wireUI(){
+  // Menu toggles
+  app.elements.btnMenu.addEventListener('click', openMenu);
+  app.elements.closeMenu.addEventListener('click', closeMenu);
+  app.elements.menuItems.forEach(btn=> btn.addEventListener('click', (e)=> {
+    const nav = e.currentTarget.dataset.nav;
+    if (nav) navigateTo(nav);
+    // special IDs
+    if (e.currentTarget.id === 'menuRestart') restartGame();
+    if (e.currentTarget.id === 'menuToggleTheme') toggleTheme();
+    closeMenu();
+  }));
+
+  // Home actions
+  app.elements.playNow.addEventListener('click', ()=> navigateTo('play', {start:true}));
+  app.elements.openSettings.addEventListener('click', ()=> navigateTo('settings'));
+  app.elements.openTools.addEventListener('click', ()=> navigateTo('tools'));
+
+  // In-play controls (also exists as top buttons)
+  app.elements.pauseBtn.addEventListener('click', ()=> {
+    if (!app.game.running) return;
+    togglePause();
+  });
+  app.elements.resetBtn.addEventListener('click', ()=> restartGame());
+
+  // Settings
+  app.elements.toggleTheme.addEventListener('click', toggleTheme);
+  app.elements.themeLight.addEventListener('click', ()=> setTheme('light'));
+  app.elements.themeDark.addEventListener('click', ()=> setTheme('dark'));
+  app.elements.saveSettings.addEventListener('click', saveSettings);
+  app.elements.cancelSettings.addEventListener('click', ()=> navigateTo('home'));
+
+  // touch dpad buttons
+  if (app.elements.touchDpad) {
+    app.elements.touchDpad.querySelectorAll('[data-dir]').forEach(btn=>{
+      btn.addEventListener('touchstart', (e)=> {
+        const dir = e.currentTarget.dataset.dir;
+        applyDirectionFromDpad(dir);
+      });
+    });
   }
-}
-function playTone(freq, duration=0.12, type='sine', when=0, gain=0.12) {
-  try {
-    ensureAudio();
-    const ctx = gameState.audioCtx;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = type;
-    o.frequency.value = freq;
-    g.gain.value = gain;
-    o.connect(g); g.connect(ctx.destination);
-    o.start(ctx.currentTime + when);
-    g.gain.setValueAtTime(gain, ctx.currentTime + when);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + duration);
-    o.stop(ctx.currentTime + when + duration + 0.02);
-  } catch (e) {
-    // audio API can be blocked by browser until user gestures; ignore silently
-    // console.warn('Audio issue', e);
-  }
-}
-function playBite(){ playTone(900, 0.08, 'square', 0, 0.08); playTone(1400, 0.06, 'sawtooth', 0.02, 0.06); }
-function playCrash(){ playTone(120, 0.35, 'sine', 0, 0.28); playTone(60, 0.25, 'sine', 0.05, 0.24); }
-function playLevelUp(){ playTone(1100,0.15,'sine',0,0.12); playTone(1400,0.18,'sine',0.12,0.12); playTone(1800,0.12,'triangle',0.3,0.09); }
 
-/* --- INIT --- */
-function initGame(){
-  elements.canvas = document.getElementById('gameCanvas');
-  elements.startBtn = document.getElementById('startBtn');
-  elements.pauseBtn = document.getElementById('pauseBtn');
-  elements.resetBtn = document.getElementById('resetBtn');
-  elements.scoreEl = document.getElementById('score');
-  elements.highScoreEl = document.getElementById('highScore');
-  elements.levelEl = document.getElementById('level');
-  elements.gameModeEl = document.getElementById('gameMode');
-  elements.gameStatus = document.getElementById('gameStatus');
-  elements.gameOverModal = document.getElementById('gameOverModal');
-  elements.gameOverScore = document.getElementById('gameOverScore');
-  elements.gameOverMessage = document.getElementById('gameOverMessage');
-  elements.levelProgress = document.getElementById('levelProgress');
-  elements.progressText = document.getElementById('progressText');
-  elements.aiStatus = document.getElementById('aiStatus');
-  elements.hudActive = document.getElementById('activePower');
+  // touch/drag on canvas
+  bindCanvasTouchAndMouse();
 
-  gameState.canvas = elements.canvas;
-  gameState.ctx = elements.canvas.getContext('2d');
-
-  setupCanvasResolution();
-  loadHighScore();
-  setupEventListeners();
-  generateFood();
-  draw();
-  console.log('🐍 Snake Arcade ready');
-}
-
-/* --- Canvas scaling --- */
-function setupCanvasResolution(){
-  const dpr = window.devicePixelRatio || 1;
-  elements.canvas.width = CONFIG.CANVAS_SIZE * dpr;
-  elements.canvas.height = CONFIG.CANVAS_SIZE * dpr;
-  elements.canvas.style.width = Math.min(CONFIG.CANVAS_SIZE, elements.canvas.parentElement.clientWidth - 40) + 'px';
-  elements.canvas.style.height = elements.canvas.style.width;
-  const ctx = elements.canvas.getContext('2d');
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  gameState.ctx = ctx;
-}
-
-/* --- Storage --- */
-function loadHighScore(){
-  gameState.highScore = parseInt(localStorage.getItem('snakeHighScore') || '0', 10);
-  updateUI();
-}
-
-/* --- Event listeners --- */
-function setupEventListeners(){
-  elements.startBtn.addEventListener('click', toggleGame);
-  elements.pauseBtn.addEventListener('click', pauseGame);
-  elements.resetBtn.addEventListener('click', resetGame);
-
-  document.querySelectorAll('.mode-btn').forEach(btn=>{
-    btn.addEventListener('click', (e)=>setGameMode(e.currentTarget.dataset.mode));
+  // keyboard
+  document.addEventListener('keydown', (e)=> {
+    if (!app.game.running || app.game.paused) return;
+    if (['ArrowUp','w','W'].includes(e.key)) setDirection(0,-1);
+    if (['ArrowDown','s','S'].includes(e.key)) setDirection(0,1);
+    if (['ArrowLeft','a','A'].includes(e.key)) setDirection(-1,0);
+    if (['ArrowRight','d','D'].includes(e.key)) setDirection(1,0);
+    if (e.code === 'Space') {
+      if (!app.game.running) startGame();
+      else togglePause();
+    }
+    if (e.key === 'r' || e.key === 'R') restartGame();
   });
 
-  document.addEventListener('keydown', handleKeyPress);
-  window.addEventListener('keydown', (e)=>{
-    if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
-  }, false);
+  // small tools (download score)
+  $('#downloadScore')?.addEventListener('click', ()=> {
+    const blob = new Blob([`Score:${app.game.score}\nHigh:${app.game.highScore}`], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'snake-score.txt'; a.click(); URL.revokeObjectURL(url);
+  });
 
-  window.addEventListener('resize', ()=>{ setupCanvasResolution(); draw(); });
-  elements.gameOverModal.addEventListener('click', (e)=>{ if(e.target===elements.gameOverModal) closeGameOver(); });
-}
-
-/* --- Input --- */
-function handleKeyPress(e){
-  // ensure audio context starts on user gesture
-  if (gameState.audioCtx && gameState.audioCtx.state === 'suspended') gameState.audioCtx.resume();
-  if (e.code === 'Space') {
-    if (!gameState.gameRunning) startGame();
-    else pauseGame();
-    return;
-  }
-  if (!gameState.gameRunning || gameState.gamePaused || gameState.gameMode === 'ai') return;
-  const k = e.key;
-  const cur = gameState.direction;
-  if ((k==='ArrowUp'||k==='w'||k==='W') && cur.y===0) gameState.direction={x:0,y:-1};
-  if ((k==='ArrowDown'||k==='s'||k==='S') && cur.y===0) gameState.direction={x:0,y:1};
-  if ((k==='ArrowLeft'||k==='a'||k==='A') && cur.x===0) gameState.direction={x:-1,y:0};
-  if ((k==='ArrowRight'||k==='d'||k==='D') && cur.x===0) gameState.direction={x:1,y:0};
-  if (k==='r'||k==='R') resetGame();
+  $('#toggleSounds')?.addEventListener('click', ()=> {
+    if (app.game.audioCtx && app.game.audioCtx.state !== 'closed') { app.game.audioCtx.close(); app.game.audioCtx = null; alert('Sounds toggled off'); }
+    else { ensureAudio(); alert('Sounds toggled on'); }
+  });
 }
 
-/* --- Mode --- */
-function setGameMode(mode){
-  if (gameState.gameRunning) return;
-  gameState.gameMode = mode;
-  document.querySelectorAll('.mode-btn').forEach(btn=>btn.classList.remove('active'));
-  const el = document.querySelector(`[data-mode="${mode}"]`); if(el) el.classList.add('active');
-  const modeText = {'human':'HUMAN','ai':'AI DEMO','vs':'VS AI'}; elements.gameModeEl.textContent = modeText[mode] || 'HUMAN';
-  updateAIStatus(mode==='ai' ? 'ACTIVE' : mode==='vs' ? 'READY' : 'STANDBY');
-  resetGame();
-}
-function updateAIStatus(status){
-  if (!elements.aiStatus) return;
-  const t = elements.aiStatus.querySelector('.ai-text'); if(t) t.textContent = status;
-  const brain = elements.aiStatus.querySelector('.ai-brain'); if(brain){
-    brain.style.borderColor = status==='ACTIVE' ? '#00ff66' : status==='READY' ? '#ff6b00' : '#0066ff';
-  }
-}
+/* Theme */
+function toggleTheme(){ document.body.classList.toggle('dark-mode'); localStorage.setItem('snake_theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light'); }
+function setTheme(t){ if (t==='dark') document.body.classList.add('dark-mode'); else document.body.classList.remove('dark-mode'); localStorage.setItem('snake_theme', t); }
 
-/* --- Loop control helpers --- */
-function restartGameLoop(){
-  clearInterval(gameState.gameLoop);
-  gameState.gameLoop = setInterval(gameStep, gameState.gameSpeed);
-}
-
-/* --- Game flow --- */
-function toggleGame(){ if (gameState.gameRunning) resetGame(); else startGame(); }
-function startGame(){
-  if (gameState.gameRunning && !gameState.gamePaused) return;
-  // start audio context on user gesture
-  try{ ensureAudio(); if (gameState.audioCtx.state==='suspended') gameState.audioCtx.resume(); }catch(e){}
-  gameState.snake = [{x:10,y:10}];
-  gameState.aiSnake = gameState.gameMode==='vs'? [{x:15,y:15}]: [];
-  gameState.direction = {x:0,y:0};
-  gameState.aiDirection = {x:1,y:0};
-  gameState.score = 0; gameState.level = 1; gameState.gameSpeed = CONFIG.INITIAL_SPEED;
-  gameState.gameRunning = true; gameState.gamePaused = false;
-  if (gameState.gameMode==='ai'){ gameState.direction={x:1,y:0}; }
-  generateFood();
-  gameState.powerups = [];
-  elements.startBtn.textContent = 'RESET';
-  elements.pauseBtn.disabled = false;
-  elements.gameStatus.style.opacity = '0';
-  if (gameState.gameMode==='ai' || gameState.gameMode==='vs') updateAIStatus('ACTIVE');
-  restartGameLoop();
-  // powerup spawn cycle
-  gameState.lastPowerupSpawn = Date.now();
-  console.log('🎮 Game started');
-}
-function pauseGame(){
-  if (!gameState.gameRunning) return;
-  gameState.gamePaused = !gameState.gamePaused;
-  elements.pauseBtn.textContent = gameState.gamePaused ? 'RESUME' : 'PAUSE';
-  if (gameState.gamePaused){
-    clearInterval(gameState.gameLoop);
-    elements.gameStatus.style.opacity = '1';
-    elements.gameStatus.querySelector('.status-text').textContent = 'GAME PAUSED';
+/* navigation */
+function navigateTo(view, options = {}) {
+  // hide all views, show target
+  app.elements.views.forEach(v => { v.style.display = 'none'; v.setAttribute('aria-hidden','true'); });
+  const target = document.querySelector(`.view-${view}`);
+  if (target) { target.style.display = 'block'; target.setAttribute('aria-hidden','false'); }
+  app.view = view;
+  // if play requested to start
+  if (view === 'play') {
+    // when entering play, show minimal chrome only
+    hideInterfaceChrome(true);
+    if (options.start) startGame();
   } else {
-    restartGameLoop();
-    elements.gameStatus.style.opacity = '0';
+    hideInterfaceChrome(false);
+    if (view === 'settings') loadSettingsIntoUI();
   }
 }
-function resetGame(){
-  clearInterval(gameState.gameLoop);
-  gameState.gameRunning = false; gameState.gamePaused=false;
-  gameState.snake = [{x:10,y:10}]; gameState.aiSnake=[]; gameState.direction={x:0,y:0};
-  gameState.score=0; gameState.level=1; gameState.gameSpeed=CONFIG.INITIAL_SPEED;
-  gameState.powerups=[]; gameState.activePower=null;
-  elements.startBtn.textContent='START'; elements.pauseBtn.textContent='PAUSE'; elements.pauseBtn.disabled=true;
-  elements.gameStatus.style.opacity='1'; elements.gameStatus.querySelector('.status-text').textContent='PRESS START TO BEGIN';
-  updateAIStatus('STANDBY'); generateFood(); updateUI(); draw();
-  console.log('🔄 Reset');
+
+/* show/hide chrome (except hamburger) */
+function hideInterfaceChrome(hide) {
+  // reduce header/footer except hamburger
+  if (hide) {
+    document.querySelector('.app-header').style.opacity = '0.08';
+    document.querySelector('.app-footer').style.opacity = '0.08';
+    // show in-play small buttons
+    document.querySelector('.inplay-controls').style.display = 'flex';
+  } else {
+    document.querySelector('.app-header').style.opacity = '1';
+    document.querySelector('.app-footer').style.opacity = '1';
+    document.querySelector('.inplay-controls').style.display = 'none';
+  }
 }
-/* --- Spawning food & power-ups --- */
+
+/* menu open/close */
+function openMenu(){ app.elements.sideMenu.classList.add('open'); app.elements.sideMenu.setAttribute('aria-hidden','false'); }
+function closeMenu(){ app.elements.sideMenu.classList.remove('open'); app.elements.sideMenu.setAttribute('aria-hidden','true'); }
+
+/* show a view by name quickly */
+function showView(name){ navigateTo(name); }
+
+// === Canvas & Game setup ===
+function setupCanvas(){
+  app.game.canvas = app.elements.playCanvas;
+  if (!app.game.canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  app.game.canvas.width = CONFIG.CANVAS_SIZE * dpr;
+  app.game.canvas.height = CONFIG.CANVAS_SIZE * dpr;
+  app.game.canvas.style.width = Math.min(CONFIG.CANVAS_SIZE, app.game.canvas.parentElement.clientWidth - 20) + 'px';
+  app.game.canvas.style.height = app.game.canvas.style.width;
+  app.game.ctx = app.game.canvas.getContext('2d');
+  app.game.ctx.setTransform(dpr,0,0,dpr,0,0);
+  window.addEventListener('resize', ()=> {
+    // scale canvas on resize
+    app.game.canvas.style.width = Math.min(CONFIG.CANVAS_SIZE, app.game.canvas.parentElement.clientWidth - 20) + 'px';
+    app.game.canvas.style.height = app.game.canvas.style.width;
+    draw();
+  });
+}
+
+/* initial game state */
+function initGameState(){
+  app.game.snake = [{x:10,y:10}];
+  app.game.aiSnake = [];
+  app.game.direction = {x:0,y:0};
+  app.game.score = 0; app.game.level = 1; app.game.speed = CONFIG.INITIAL_SPEED;
+  loadHighScore();
+  generateFood();
+  draw();
+}
+
+/* storage */
+function loadHighScore(){ app.game.highScore = parseInt(localStorage.getItem('snakeHighScore') || '0',10) || 0; updateUI(); }
+
+// === GAME LOGIC (integrated from previous) ===
+
+// audio helpers
+function ensureAudio(){
+  try {
+    if (!app.game.audioCtx) app.game.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch(e){}
+}
+function playTone(freq, dur=0.08, type='sine', when=0, gain=0.12){
+  try {
+    ensureAudio();
+    const ctx = app.game.audioCtx;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    o.connect(g); g.connect(ctx.destination);
+    g.gain.value = gain;
+    o.start(ctx.currentTime + when);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + dur);
+    o.stop(ctx.currentTime + when + dur + 0.02);
+  } catch(e){}
+}
+function playBite(){ playTone(900,0.07,'square',0,0.07); playTone(1400,0.06,'sawtooth',0.02,0.05); }
+function playCrash(){ playTone(120,0.35,'sine',0,0.28); playTone(60,0.25,'sine',0.05,0.24); }
+function playLevelUp(){ playTone(1100,0.12,'sine',0,0.12); playTone(1400,0.12,'sine',0.12,0.12); }
+
+// spawn food
 function generateFood(){
   const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE;
-  let pos;
+  let newFood;
   do {
-    pos = {x:Math.floor(Math.random()*TILE_COUNT), y:Math.floor(Math.random()*TILE_COUNT)};
-  } while (isPositionOnSnake(pos, gameState.snake) || isPositionOnSnake(pos, gameState.aiSnake) || isPowerupAt(pos));
-  gameState.food = pos;
+    newFood = {x: Math.floor(Math.random()*TILE_COUNT), y:Math.floor(Math.random()*TILE_COUNT)};
+  } while (isOnSnake(newFood, app.game.snake) || isOnSnake(newFood, app.game.aiSnake) || isPowerupAt(newFood));
+  app.game.food = newFood;
 }
-function isPowerupAt(pos){ return gameState.powerups.some(p=>p.x===pos.x && p.y===pos.y); }
+
+// power-ups spawn
 function spawnPowerupRandom(){
   const now = Date.now();
-  if (now - gameState.lastPowerupSpawn < CONFIG.POWERUP_SPAWN_FREQ) return;
-  gameState.lastPowerupSpawn = now + Math.floor(Math.random()*4000); // jitter
+  if (now - app.game.lastPowerupSpawn < CONFIG.POWERUP_SPAWN_FREQ) return;
+  app.game.lastPowerupSpawn = now + Math.floor(Math.random()*4000);
   const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE;
-  let pos;
-  let attempts=0;
+  let pos, attempts=0;
   do {
     pos = {x:Math.floor(Math.random()*TILE_COUNT), y:Math.floor(Math.random()*TILE_COUNT)};
-    attempts++;
-    if(attempts>200) return;
-  } while (isPositionOnSnake(pos, gameState.snake) || isPositionOnSnake(pos, gameState.aiSnake) || (pos.x===gameState.food.x && pos.y===gameState.food.y));
-  // pick random type, bias so 'bonus' less common
-  const r = Math.random();
-  const type = r<0.55 ? 'speed' : r<0.85 ? 'slow' : 'bonus';
-  gameState.powerups.push({x:pos.x,y:pos.y,type,createdAt:now});
+    attempts++; if (attempts>200) return;
+  } while (isOnSnake(pos, app.game.snake) || isOnSnake(pos, app.game.aiSnake) || (pos.x===app.game.food.x && pos.y===app.game.food.y));
+  const r = Math.random(); const type = r<0.55 ? 'speed' : r<0.85 ? 'slow' : 'bonus';
+  app.game.powerups.push({x:pos.x,y:pos.y,type,createdAt:now});
 }
 
-/* --- Collision helpers --- */
-function isPositionOnSnake(pos, snake){
-  if(!snake) return false;
-  return snake.some(s=>s.x===pos.x && s.y===pos.y);
-}
+function isPowerupAt(pos){ return app.game.powerups.some(p=>p.x===pos.x && p.y===pos.y) }
+function isOnSnake(pos, snake){ if(!snake) return false; return snake.some(s => s.x===pos.x && s.y===pos.y) }
 
-/* --- Game step --- */
-function gameStep(){
-  if (!gameState.gameRunning || gameState.gamePaused) return;
-  // spawn power-ups occasionally
-  spawnPowerupRandom();
-
-  // move main snake
-  if (gameState.gameMode==='human' || gameState.gameMode==='vs') {
-    moveSnake(gameState.snake, gameState.direction);
-  }
-  if (gameState.gameMode==='ai') {
-    const aiMove = aiNextMoveBFS(gameState.snake, gameState.food);
-    gameState.direction = aiMove || gameState.direction;
-    moveSnake(gameState.snake, gameState.direction);
-  }
-  if (gameState.gameMode==='vs' && gameState.aiSnake.length>0) {
-    const aiMove = aiNextMoveBFS(gameState.aiSnake, gameState.food, true);
-    gameState.aiDirection = aiMove || gameState.aiDirection;
-    moveSnake(gameState.aiSnake, gameState.aiDirection);
-  }
-
-  // collisions and outcomes
-  if (gameState.gameMode !== 'ai') {
-    if (checkCollision(gameState.snake)) {
-      // if collided with AI body in VS mode, AI wins
-      const head = gameState.snake[0];
-      if (gameState.aiSnake.length>0 && isPositionOnSnake(head, gameState.aiSnake)) {
-        gameOver('AI'); return;
-      }
-      gameOver('AI'); return;
-    }
-  } else {
-    if (checkCollision(gameState.snake)) { gameOver(); return; }
-  }
-
-  if (gameState.gameMode==='vs' && gameState.aiSnake.length>0) {
-    if (checkCollision(gameState.aiSnake)) { gameOver('PLAYER'); return; }
-    // head-on collision
-    const pHead = gameState.snake[0], aHead = gameState.aiSnake[0];
-    if (pHead.x===aHead.x && pHead.y===aHead.y) {
-      if (gameState.snake.length > gameState.aiSnake.length) gameOver('PLAYER');
-      else if (gameState.snake.length < gameState.aiSnake.length) gameOver('AI');
-      else gameOver('TIE');
-      return;
-    }
-  }
-
-  // food collisions
-  const head = gameState.snake[0];
-  if (head.x===gameState.food.x && head.y===gameState.food.y) {
-    eatFood(gameState.snake, true);
-  }
-  if (gameState.aiSnake.length>0) {
-    const aiHead = gameState.aiSnake[0];
-    if (aiHead.x===gameState.food.x && aiHead.y===gameState.food.y) {
-      eatFood(gameState.aiSnake, false);
-    }
-  }
-
-  // powerup collisions
-  if (checkPowerupCollision(gameState.snake, true)) return;
-  if (gameState.aiSnake.length>0) checkPowerupCollision(gameState.aiSnake, false);
-
-  // update draw and UI
-  draw();
-  updateUI();
-}
-
-/* --- Move snake --- */
+// move snake
 function moveSnake(snake, direction){
   if (!direction || (direction.x===0 && direction.y===0)) return;
-  if (snake.length>1) {
+  if (snake.length>1){
     const next = {x:snake[0].x+direction.x, y:snake[0].y+direction.y};
-    if (next.x===snake[1].x && next.y===snake[1].y) return; // prevent 180
+    if (next.x===snake[1].x && next.y===snake[1].y) return;
   }
   const head = {x:snake[0].x+direction.x, y:snake[0].y+direction.y};
   snake.unshift(head);
   if (!snake.foodEaten) snake.pop(); else snake.foodEaten = false;
 }
 
-/* --- Eat food --- */
+// eat food
 function eatFood(snake, updateScore=true){
   snake.foodEaten = true;
-  if (updateScore) {
-    gameState.score += CONFIG.POINTS_PER_FOOD;
+  if (updateScore){
+    app.game.score += CONFIG.POINTS_PER_FOOD;
     playBite();
-    // level up check
-    const newLevel = Math.floor(gameState.score / CONFIG.POINTS_PER_LEVEL) + 1;
-    if (newLevel > gameState.level) {
-      gameState.level = newLevel;
-      gameState.gameSpeed = Math.max(50, CONFIG.INITIAL_SPEED - (gameState.level * CONFIG.SPEED_INCREASE));
-      restartGameLoop();
+    const newLevel = Math.floor(app.game.score / CONFIG.POINTS_PER_LEVEL) + 1;
+    if (newLevel > app.game.level){
+      app.game.level = newLevel;
+      app.game.speed = Math.max(50, CONFIG.INITIAL_SPEED - (app.game.level * CONFIG.SPEED_INCREASE));
+      restartLoop();
       playLevelUp();
     }
   }
   generateFood();
 }
 
-/* --- Power-up collision/effects --- */
+// powerup collision & apply
 function checkPowerupCollision(snake, isPlayer){
   const head = snake[0];
-  for (let i=0;i<gameState.powerups.length;i++){
-    const p = gameState.powerups[i];
+  for (let i=0;i<app.game.powerups.length;i++){
+    const p = app.game.powerups[i];
     if (head.x===p.x && head.y===p.y){
-      // apply effect
       applyPowerup(p.type, isPlayer);
-      // remove powerup
-      gameState.powerups.splice(i,1);
+      app.game.powerups.splice(i,1);
       return true;
     }
   }
   return false;
 }
 function applyPowerup(type, isPlayer){
-  // Only player's power-ups affect score/speed etc. AI will "eat" but we can give it length by foodEaten
   if (type==='bonus'){
-    if (isPlayer){
-      gameState.score += 50;
-      elements.hudActive.textContent = 'BONUS +50';
-      playBite();
-    }
+    if (isPlayer){ app.game.score += 50; app.elements.hudActive.textContent='BONUS +50'; playBite(); }
   } else if (type==='speed'){
-    if (isPlayer){
-      elements.hudActive.textContent = 'SPEED BOOST';
-      setActivePower('speed', CONFIG.POWERUP_DURATION);
-      playToneSequence([1000,1400,1800],0.05);
-    } else {
-      // AI speed boost - make AI move twice this frame by giving it temporary advantage (no-op for now)
-    }
+    if (isPlayer){ app.elements.hudActive.textContent = '⚡ SPEED BOOST'; setActivePower('speed', CONFIG.POWERUP_DURATION); playToneSequence([1000,1400,1800]); }
   } else if (type==='slow'){
-    if (isPlayer){
-      elements.hudActive.textContent = 'SLOWED';
-      setActivePower('slow', CONFIG.POWERUP_DURATION);
-      playToneSequence([400,320],0.09);
-    }
+    if (isPlayer){ app.elements.hudActive.textContent='🐌 SLOWED'; setActivePower('slow', CONFIG.POWERUP_DURATION); playToneSequence([400,320]); }
   }
-  // ensure UI updates
-  updateUI();
-  // small animation clearing after duration will be handled by setActivePower
 }
 function setActivePower(type, duration){
-  // clear old
-  if (gameState.activePower && gameState.activePower.timer) clearTimeout(gameState.activePower.timer);
-  const prev = gameState.activePower ? gameState.activePower.type : null;
-  // apply
-  if (type==='speed'){
-    // speed boost -> temporarily increase speed (decrease ms)
-    gameState.gameSpeed = Math.max(45, gameState.gameSpeed - 60);
-    restartGameLoop();
-  } else if (type==='slow'){
-    // slow -> temporarily slow game
-    gameState.gameSpeed = gameState.gameSpeed + 80;
-    restartGameLoop();
-  }
-  gameState.activePower = {type, expiresAt: Date.now() + duration};
-  // UI indicator
-  elements.hudActive.textContent = (type==='speed' ? '⚡ SPEED BOOST' : type==='slow' ? '🐌 SLOW DOWN' : type.toUpperCase());
-  // schedule revert
-  gameState.activePower.timer = setTimeout(()=>{
-    // revert effect: restore base speed depending on level
-    gameState.gameSpeed = Math.max(50, CONFIG.INITIAL_SPEED - (gameState.level * CONFIG.SPEED_INCREASE));
-    restartGameLoop();
-    gameState.activePower = null;
-    elements.hudActive.textContent = '';
+  if (app.game.activePower && app.game.activePower.timer) clearTimeout(app.game.activePower.timer);
+  if (type==='speed'){ app.game.speed = Math.max(45, app.game.speed - 60); restartLoop(); }
+  else if (type==='slow'){ app.game.speed = app.game.speed + 80; restartLoop(); }
+  app.game.activePower = {type, expiresAt: Date.now() + duration};
+  app.game.activePower.timer = setTimeout(()=> {
+    app.game.speed = Math.max(50, CONFIG.INITIAL_SPEED - (app.game.level * CONFIG.SPEED_INCREASE));
+    restartLoop();
+    app.game.activePower = null;
+    app.elements.hudActive.textContent = '';
   }, duration);
 }
-/* tiny melody helper */
-function playToneSequence(freqs, dur){
-  let t=0;
-  for (const f of freqs){ playTone(f,dur,'sine',t,0.09); t += dur+0.02; }
-}
+function playToneSequence(freqs){ let t=0; for(const f of freqs){ playTone(f,0.06,'sine',t,0.09); t += 0.08; } }
 
-/* --- Collision detection --- */
+// check collisions
 function checkCollision(snake){
   if (!snake || snake.length===0) return false;
   const head = snake[0];
   const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE;
-  // walls
   if (head.x<0||head.x>=TILE_COUNT||head.y<0||head.y>=TILE_COUNT) return true;
-  // self
   for (let i=1;i<snake.length;i++) if (head.x===snake[i].x && head.y===snake[i].y) return true;
   return false;
 }
 
-/* --- Game Over --- */
+// game over
 function gameOver(winner){
-  clearInterval(gameState.gameLoop);
-  gameState.gameRunning = false;
-  // high score update (player)
-  if (gameState.score > gameState.highScore){
-    gameState.highScore = gameState.score;
-    localStorage.setItem('snakeHighScore', String(gameState.highScore));
-    elements.gameOverMessage.textContent = '🎉 NEW HIGH SCORE! 🎉';
-  } else {
-    if (winner==='PLAYER') elements.gameOverMessage.textContent = 'YOU WIN! GREAT JOB!';
-    else if (winner==='AI') elements.gameOverMessage.textContent = 'AI WINS — TRY AGAIN!';
-    else if (winner==='TIE') elements.gameOverMessage.textContent = "IT'S A TIE!";
-    else elements.gameOverMessage.textContent = 'TRY AGAIN TO BEAT YOUR HIGH SCORE!';
+  clearInterval(app.game.loop);
+  app.game.running = false;
+  if (app.game.score > app.game.highScore){
+    app.game.highScore = app.game.score; localStorage.setItem('snakeHighScore', String(app.game.highScore));
+    app.elements.gameOverMessage = 'NEW HIGH SCORE!';
   }
-  elements.gameOverScore.textContent = String(gameState.score).padStart(6,'0');
-  elements.gameOverModal.style.display = 'flex';
-  elements.gameOverModal.setAttribute('aria-hidden','false');
-  updateAIStatus('STANDBY');
+  $('#gameOverScore').textContent = String(app.game.score).padStart(6,'0');
+  app.elements.gameOverModal.classList.add('show');
+  app.elements.gameOverModal.setAttribute('aria-hidden','false');
   playCrash();
   updateUI();
 }
 
-/* --- Close Game Over --- */
-function closeGameOver(){
-  elements.gameOverModal.style.display = 'none';
-  elements.gameOverModal.setAttribute('aria-hidden','true');
-  resetGame();
-}
+// close game over (called by buttons)
+function closeGameOver(){ app.elements.gameOverModal.classList.remove('show'); app.elements.gameOverModal.setAttribute('aria-hidden','true'); navigateTo('home'); }
 
-/* --- UI updates --- */
+// update UI
 function updateUI(){
-  elements.scoreEl.textContent = String(gameState.score).padStart(6,'0');
-  elements.highScoreEl.textContent = String(gameState.highScore).padStart(6,'0');
-  elements.levelEl.textContent = String(gameState.level).padStart(3,'0');
-  const progressPercent = (gameState.score % CONFIG.POINTS_PER_LEVEL) / CONFIG.POINTS_PER_LEVEL * 100;
-  if (elements.levelProgress) elements.levelProgress.style.width = progressPercent + '%';
-  if (elements.progressText) elements.progressText.textContent = `${gameState.score % CONFIG.POINTS_PER_LEVEL}/${CONFIG.POINTS_PER_LEVEL}`;
-  // active power HUD handled elsewhere
+  // in this simplified UI we update hud and settings where needed
+  // score display on home could be updated here (left as an exercise)
 }
 
-/* --- DRAWING --- */
+// draw
 function draw(){
-  const ctx = gameState.ctx;
+  const ctx = app.game.ctx;
   const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE;
-  // clear
   ctx.fillStyle = '#000';
   ctx.fillRect(0,0,CONFIG.CANVAS_SIZE,CONFIG.CANVAS_SIZE);
 
-  // subtle grid
-  ctx.strokeStyle = '#002200';
+  // grid
+  ctx.strokeStyle = 'rgba(0,80,0,0.08)';
   ctx.lineWidth = 1;
   for (let i=0;i<=TILE_COUNT;i++){
     ctx.beginPath();
@@ -507,202 +392,298 @@ function draw(){
     ctx.stroke();
   }
 
-  // draw power-ups first (behind snakes)
-  for (const p of gameState.powerups){
-    drawPowerup(p);
-  }
+  // powerups
+  for (const p of app.game.powerups) drawPowerup(p);
 
-  // food glow
-  ctx.save();
-  ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 12;
+  // food
+  ctx.save(); ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 12;
   ctx.fillStyle = '#ff4444';
-  ctx.fillRect(gameState.food.x*CONFIG.GRID_SIZE + 2, gameState.food.y*CONFIG.GRID_SIZE + 2, CONFIG.GRID_SIZE-4, CONFIG.GRID_SIZE-4);
+  ctx.fillRect(app.game.food.x*CONFIG.GRID_SIZE + 2, app.game.food.y*CONFIG.GRID_SIZE + 2, CONFIG.GRID_SIZE-4, CONFIG.GRID_SIZE-4);
   ctx.restore();
 
-  // draw AI snake if present
-  if (gameState.aiSnake.length>0) drawSnake(gameState.aiSnake, '#c38cff', '#8b5ed8');
-
-  // draw player snake
-  drawSnake(gameState.snake, '#00ff66', '#00aa55');
+  if (app.game.aiSnake.length>0) drawSnake(app.game.aiSnake, '#c38cff', '#8b5ed8');
+  drawSnake(app.game.snake, '#00b894', '#007c62');
 }
 
-/* draw single powerup (colored cell + emoji) */
 function drawPowerup(p){
-  const ctx = gameState.ctx;
-  const x = p.x * CONFIG.GRID_SIZE, y = p.y * CONFIG.GRID_SIZE;
+  const ctx = app.game.ctx, x=p.x*CONFIG.GRID_SIZE, y=p.y*CONFIG.GRID_SIZE;
   ctx.save();
-  if (p.type === 'speed'){
-    ctx.shadowColor = '#ffff66'; ctx.shadowBlur = 10; ctx.fillStyle = '#ffe86b';
-  } else if (p.type === 'slow'){
-    ctx.shadowColor = '#66ccff'; ctx.shadowBlur = 10; ctx.fillStyle = '#66c9ff';
-  } else if (p.type === 'bonus'){
-    ctx.shadowColor = '#ffd1ff'; ctx.shadowBlur = 12; ctx.fillStyle = '#ffb3ff';
-  } else {
-    ctx.fillStyle = '#ffffff';
-  }
+  if (p.type==='speed'){ ctx.shadowColor='#fff3b0'; ctx.shadowBlur=10; ctx.fillStyle='#ffd166'; }
+  else if (p.type==='slow'){ ctx.shadowColor='#cfefff'; ctx.shadowBlur=10; ctx.fillStyle='#66c9ff'; }
+  else { ctx.shadowColor='#eec8ff'; ctx.shadowBlur=10; ctx.fillStyle='#ffb3ff'; }
   ctx.fillRect(x+2,y+2,CONFIG.GRID_SIZE-4,CONFIG.GRID_SIZE-4);
   ctx.restore();
-  // draw icon (emoji) - fallback to simple circle if emoji not render nicely
   ctx.save();
   ctx.font = `${Math.max(12, Math.floor(CONFIG.GRID_SIZE/1.6))}px sans-serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline='middle';
-  let icon = '';
-  if (p.type==='speed') icon='⚡'; else if (p.type==='slow') icon='🐌'; else if (p.type==='bonus') icon='💎';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const icon = p.type==='speed' ? '⚡' : p.type==='slow' ? '🐌' : '💎';
   ctx.fillText(icon, x + CONFIG.GRID_SIZE/2, y + CONFIG.GRID_SIZE/2 + 1);
   ctx.restore();
 }
 
-/* draw snake */
 function drawSnake(snake, headColor, bodyColor){
-  const ctx = gameState.ctx;
-  if (!snake || snake.length===0) return;
+  const ctx = app.game.ctx;
   snake.forEach((seg, idx)=>{
     const x = seg.x*CONFIG.GRID_SIZE, y = seg.y*CONFIG.GRID_SIZE;
     if (idx===0){
-      ctx.save();
-      ctx.shadowColor = headColor; ctx.shadowBlur=8; ctx.fillStyle = headColor;
-      ctx.fillRect(x+1,y+1,CONFIG.GRID_SIZE-2,CONFIG.GRID_SIZE-2); ctx.restore();
-      // eyes
-      ctx.fillStyle='#000';
-      const eye = Math.max(2, Math.floor(CONFIG.GRID_SIZE/6));
-      ctx.fillRect(x+5,y+6,eye,eye);
-      ctx.fillRect(x+5+eye+2,y+6,eye,eye);
+      ctx.save(); ctx.shadowColor=headColor; ctx.shadowBlur=8; ctx.fillStyle=headColor; ctx.fillRect(x+1,y+1,CONFIG.GRID_SIZE-2,CONFIG.GRID_SIZE-2); ctx.restore();
+      ctx.fillStyle='#000'; const eye = Math.max(2, Math.floor(CONFIG.GRID_SIZE/6)); ctx.fillRect(x+5,y+6,eye,eye); ctx.fillRect(x+5+eye+2,y+6,eye,eye);
     } else {
-      ctx.save(); ctx.fillStyle = bodyColor; ctx.shadowColor = bodyColor; ctx.shadowBlur=3;
-      ctx.fillRect(x+1,y+1,CONFIG.GRID_SIZE-2,CONFIG.GRID_SIZE-2); ctx.restore();
+      ctx.save(); ctx.fillStyle=bodyColor; ctx.shadowColor=bodyColor; ctx.shadowBlur=3; ctx.fillRect(x+1,y+1,CONFIG.GRID_SIZE-2,CONFIG.GRID_SIZE-2); ctx.restore();
     }
   });
 }
 
-/* --- AI: BFS pathfinding to food avoiding walls and bodies --- */
-/* returns a direction {x,y} or null if not found */
-function aiNextMoveBFS(snake, goal, isVSMode=false){
+// restart loop on speed change
+function restartLoop(){ clearInterval(app.game.loop); if (app.game.running) app.game.loop = setInterval(gameStep, app.game.speed); }
+
+// === AI BFS pathfinding (similar to earlier) ===
+function aiNextMoveBFS(snake, goal){
   const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE;
-  // build grid of blocked cells
   const blocked = new Set();
-  // block snake bodies (including tail except last cell if it will move - but we'll keep simple and block all body except head)
-  const allBodies = [];
-  // add player snake bodies if AI should avoid them (always avoid)
-  allBodies.push(...gameState.snake);
-  // add AI snake bodies except if searching for AI itself (we will pass snake param - but still block other snake)
-  if (gameState.aiSnake && gameState.aiSnake.length>0 && !isVSMode) allBodies.push(...gameState.aiSnake);
-  // mark bodies
-  for (const s of allBodies){
-    blocked.add(`${s.x},${s.y}`);
-  }
-  // Also ensure snake self-collisions for path calculation are considered except head
+  // block bodies (simple)
+  for (const s of app.game.snake) blocked.add(`${s.x},${s.y}`);
+  for (const s of app.game.aiSnake) blocked.add(`${s.x},${s.y}`);
   for (let i=1;i<snake.length;i++) blocked.add(`${snake[i].x},${snake[i].y}`);
 
-  // BFS
   const start = {x:snake[0].x,y:snake[0].y};
-  const queue = [];
-  const visited = new Set();
-  const parent = new Map();
-  queue.push(start);
-  visited.add(`${start.x},${start.y}`);
+  const q = [start]; const visited=new Set([`${start.x},${start.y}`]); const parent=new Map();
   const dirs = [{x:0,y:-1},{x:0,y:1},{x:-1,y:0},{x:1,y:0}];
   let found=false, destKey=null;
-  while(queue.length>0 && !found){
-    const cur = queue.shift();
+  while(q.length && !found){
+    const cur = q.shift();
     for (const d of dirs){
-      const nx = cur.x + d.x, ny = cur.y + d.y;
-      const key = `${nx},${ny}`;
+      const nx = cur.x + d.x, ny = cur.y + d.y, key = `${nx},${ny}`;
       if (nx<0||ny<0||nx>=TILE_COUNT||ny>=TILE_COUNT) continue;
       if (visited.has(key)) continue;
-      // allow stepping into goal even if previously "blocked"
-      if (nx===goal.x && ny===goal.y){
-        parent.set(key, `${cur.x},${cur.y}`);
-        found=true; destKey=key; break;
-      }
+      if (nx===goal.x && ny===goal.y){ parent.set(key, `${cur.x},${cur.y}`); found=true; destKey=key; break; }
       if (blocked.has(key)) continue;
-      visited.add(key);
-      parent.set(key, `${cur.x},${cur.y}`);
-      queue.push({x:nx,y:ny});
+      visited.add(key); parent.set(key, `${cur.x},${cur.y}`); q.push({x:nx,y:ny});
     }
   }
-  if (!found) {
-    // fallback: greedy move toward food but avoid immediate collisions
-    return greedyAIFallback(snake, goal);
-  }
-  // reconstruct path from destKey back to start
-  const path = [];
-  let curKey = destKey;
-  while(curKey && curKey !== `${start.x},${start.y}`){
-    const [cx,cy] = curKey.split(',').map(Number);
-    path.unshift({x:cx,y:cy});
-    curKey = parent.get(curKey);
-  }
+  if (!found) return greedyFallback(snake, goal);
+  const path = []; let curKey = destKey;
+  while(curKey && curKey !== `${start.x},${start.y}`){ const [cx,cy]=curKey.split(',').map(Number); path.unshift({x:cx,y:cy}); curKey = parent.get(curKey); }
   if (path.length===0) return null;
-  const next = path[0];
-  return {x: next.x - start.x, y: next.y - start.y};
+  const next = path[0]; return {x: next.x - start.x, y: next.y - start.y};
 }
 
-/* greedy fallback (simple evaluate moves) */
-function greedyAIFallback(snake, food){
+function greedyFallback(snake, food){
   const head = snake[0];
   const moves = [{x:0,y:-1},{x:0,y:1},{x:-1,y:0},{x:1,y:0}];
   let best=null, bestScore=-1e9;
   for (const m of moves){
     const np = {x: head.x+m.x, y: head.y+m.y};
-    if (!isValidPos(np, snake)) continue;
-    // score by closeness
-    const dist = Math.abs(np.x - food.x) + Math.abs(np.y - food.y);
+    if (!isValidPos(np)) continue;
+    const dist = Math.abs(np.x-food.x)+Math.abs(np.y-food.y);
     let score = -dist;
-    // prefer center
-    const center = (CONFIG.CANVAS_SIZE/CONFIG.GRID_SIZE)/2;
-    score -= (Math.abs(np.x-center)+Math.abs(np.y-center))*0.1;
-    if (score > bestScore){ bestScore = score; best = m; }
+    const center = (CONFIG.CANVAS_SIZE/CONFIG.GRID_SIZE)/2; score -= (Math.abs(np.x-center)+Math.abs(np.y-center))*0.1;
+    if (score>bestScore){ bestScore=score; best=m; }
   }
   return best;
 }
-function isValidPos(pos, snake){
-  const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE;
-  if (pos.x<0||pos.y<0||pos.x>=TILE_COUNT||pos.y>=TILE_COUNT) return false;
-  // avoid any snake body
-  if (isPositionOnSnake(pos, gameState.snake)) return false;
-  if (isPositionOnSnake(pos, gameState.aiSnake)) return false;
-  return true;
+function isValidPos(pos){ const TILE_COUNT = CONFIG.CANVAS_SIZE / CONFIG.GRID_SIZE; if (pos.x<0||pos.y<0||pos.x>=TILE_COUNT||pos.y>=TILE_COUNT) return false; if (isOnSnake(pos, app.game.snake)) return false; if (isOnSnake(pos, app.game.aiSnake)) return false; return true; }
+// === Game main step ===
+function gameStep(){
+  if (!app.game.running || app.game.paused) return;
+  spawnPowerupRandom();
+
+  if (app.game.mode === 'human' || app.game.mode === 'vs') moveSnake(app.game.snake, app.game.direction);
+  if (app.game.mode === 'ai'){
+    const aiMove = aiNextMoveBFS(app.game.snake, app.game.food);
+    app.game.direction = aiMove || app.game.direction;
+    moveSnake(app.game.snake, app.game.direction);
+  }
+  if (app.game.mode === 'vs' && app.game.aiSnake.length>0){
+    const aimove = aiNextMoveBFS(app.game.aiSnake, app.game.food);
+    app.game.aiDirection = aimove || app.game.aiDirection;
+    moveSnake(app.game.aiSnake, app.game.aiDirection);
+  }
+
+  // collisions
+  if (app.game.mode !== 'ai'){
+    if (checkCollision(app.game.snake)) { const head = app.game.snake[0]; if (app.game.aiSnake.length>0 && isOnSnake(head, app.game.aiSnake)) { gameOver('AI'); return; } gameOver('AI'); return; }
+  } else { if (checkCollision(app.game.snake)) { gameOver(); return; } }
+
+  if (app.game.mode === 'vs' && app.game.aiSnake.length>0){
+    if (checkCollision(app.game.aiSnake)) { gameOver('PLAYER'); return; }
+    const pHead = app.game.snake[0], aHead = app.game.aiSnake[0];
+    if (pHead.x===aHead.x && pHead.y===aHead.y) { if (app.game.snake.length>app.game.aiSnake.length) gameOver('PLAYER'); else if (app.game.snake.length<app.game.aiSnake.length) gameOver('AI'); else gameOver('TIE'); return; }
+  }
+
+  // food collisions
+  const head = app.game.snake[0];
+  if (head.x===app.game.food.x && head.y===app.game.food.y) eatFood(app.game.snake, true);
+  if (app.game.aiSnake.length>0){ const aiHead = app.game.aiSnake[0]; if (aiHead.x===app.game.food.x && aiHead.y===app.game.food.y) eatFood(app.game.aiSnake, false); }
+
+  // powerups
+  if (checkPowerupCollision(app.game.snake, true)) { /* handled */ }
+  if (app.game.aiSnake.length>0) checkPowerupCollision(app.game.aiSnake, false);
+
+  draw();
+  updateUI();
 }
 
-/* --- Utility restart loop (to apply new speed) --- */
-function restartGameLoop(){
-  clearInterval(gameState.gameLoop);
-  gameState.gameLoop = setInterval(gameStep, gameState.gameSpeed);
+// === Controls: start/pause/restart ===
+function startGame(){
+  if (app.game.running && !app.game.paused) return;
+  ensureAudio();
+  app.game.snake = [{x:10,y:10}];
+  app.game.aiSnake = app.game.mode === 'vs' ? [{x:15,y:15}] : [];
+  if (app.game.mode === 'ai') app.game.direction = {x:1,y:0};
+  app.game.score = 0; app.game.level = 1; app.game.speed = CONFIG.INITIAL_SPEED;
+  app.game.running = true; app.game.paused = false;
+  generateFood(); app.game.powerups = []; app.game.lastPowerupSpawn = Date.now();
+  app.elements.gameStatus.style.opacity = '0';
+  clearInterval(app.game.loop); app.game.loop = setInterval(gameStep, app.game.speed);
+}
+function togglePause(){ if (!app.game.running) return; app.game.paused = !app.game.paused; app.elements.pauseBtn.textContent = app.game.paused ? 'Resume' : 'Pause'; if (app.game.paused) clearInterval(app.game.loop); else app.game.loop = setInterval(gameStep, app.game.speed); }
+function restartGame(){ clearInterval(app.game.loop); app.game.running = false; app.game.paused = false; app.game.snake = [{x:10,y:10}]; app.game.aiSnake = []; app.game.direction={x:0,y:0}; app.game.score=0; app.game.level=1; app.game.speed=CONFIG.INITIAL_SPEED; app.game.powerups=[]; app.elements.hudActive.textContent=''; app.elements.gameStatus.style.opacity = '1'; app.elements.gameStatus.querySelector('.status-text').textContent = 'PRESS START TO BEGIN'; draw(); }
+function restartLoop(){ clearInterval(app.game.loop); if (app.game.running) app.game.loop = setInterval(gameStep, app.game.speed); }
+
+// navigation helper for menu buttons
+function navigateTo(target, opts){
+  if (target === 'home') { closeMenu(); showView('home'); }
+  else if (target === 'play') { closeMenu(); showView('play'); if (opts && opts.start) startGame(); }
+  else if (target === 'settings') { closeMenu(); showView('settings'); }
+  else if (target === 'tools') { closeMenu(); showView('tools'); }
 }
 
-/* --- Power-up lifetime cleanup (optional) --- */
-/* keep powerups for up to 35s then remove */
-setInterval(()=>{
+// show specific view
+function showView(name){
+  document.querySelectorAll('.view').forEach(v => { v.style.display = 'none'; v.setAttribute('aria-hidden','true'); });
+  const view = document.querySelector(`.view-${name}`);
+  if (view){ view.style.display = 'block'; view.setAttribute('aria-hidden','false'); }
+  if (name === 'play') hideInterfaceChrome(true); else hideInterfaceChrome(false);
+}
+
+// hide interface chrome
+function hideInterfaceChrome(hide){
+  document.querySelector('.app-header').style.opacity = hide ? '0.12' : '1';
+  document.querySelector('.app-footer').style.opacity = hide ? '0.12' : '1';
+  document.querySelector('.inplay-controls').style.display = hide ? 'flex' : 'none';
+}
+
+// === Touch & Drag Controls ===
+function bindCanvasTouchAndMouse(){
+  const canvas = app.game.canvas;
+  if (!canvas) return;
+  // touchstart
+  canvas.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    app.game.touchStart = {x:t.clientX, y:t.clientY, time:Date.now()};
+    app.game.touchLast = {x:t.clientX, y:t.clientY};
+  }, {passive:true});
+  // touchmove -> drag direction
+  canvas.addEventListener('touchmove', (e) => {
+    const t = e.touches[0];
+    const dx = t.clientX - app.game.touchStart.x;
+    const dy = t.clientY - app.game.touchStart.y;
+    const thresh = (app.elements.touchSensitivity?.value ? parseInt(app.elements.touchSensitivity.value,10) : app.game.touchSensitivity);
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > thresh){
+      setDirection(dx > 0 ? 1 : -1, 0);
+      app.game.touchStart.x = t.clientX; app.game.touchStart.y = t.clientY;
+    } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > thresh){
+      setDirection(0, dy > 0 ? 1 : -1);
+      app.game.touchStart.x = t.clientX; app.game.touchStart.y = t.clientY;
+    }
+  }, {passive:true});
+  // touchend -> swipe short gesture
+  canvas.addEventListener('touchend', (e) => {
+    if (!app.game.touchStart) return;
+    const t = app.game.touchLast || app.game.touchStart;
+    const dx = t.x - app.game.touchStart.x;
+    const dy = t.y - app.game.touchStart.y;
+    const dt = Date.now() - app.game.touchStart.time;
+    const swipeThresh = 30;
+    if (dt < 500 && (Math.abs(dx) > swipeThresh || Math.abs(dy) > swipeThresh)){
+      if (Math.abs(dx) > Math.abs(dy)) setDirection(dx>0?1:-1, 0); else setDirection(0, dy>0?1:-1);
+    }
+    app.game.touchStart = null; app.game.touchLast = null;
+  }, {passive:true});
+
+  // mouse drag for desktop (optional)
+  let dragging = false;
+  canvas.addEventListener('mousedown', (e) => { dragging = true; app.game.touchStart = {x:e.clientX,y:e.clientY}; });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging || !app.game.touchStart) return;
+    const dx = e.clientX - app.game.touchStart.x, dy = e.clientY - app.game.touchStart.y;
+    const thresh = 20;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > thresh) { setDirection(dx>0?1:-1,0); app.game.touchStart.x = e.clientX; app.game.touchStart.y = e.clientY; }
+    else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > thresh) { setDirection(0,dy>0?1:-1); app.game.touchStart.x = e.clientX; app.game.touchStart.y = e.clientY; }
+  });
+  window.addEventListener('mouseup', ()=> { dragging=false; app.game.touchStart=null; });
+}
+
+// helper to set direction but prevent 180 turns
+function setDirection(x,y){
+  const cur = app.game.direction;
+  if (cur.x === -x && cur.y === -y && app.game.snake.length > 1) return;
+  app.game.direction = {x,y};
+}
+
+// dpad helper
+function applyDirectionFromDpad(dir){
+  if (dir === 'up') setDirection(0,-1);
+  if (dir === 'down') setDirection(0,1);
+  if (dir === 'left') setDirection(-1,0);
+  if (dir === 'right') setDirection(1,0);
+}
+
+// === Settings persistence ===
+function loadSettings(){
+  const theme = localStorage.getItem('snake_theme') || 'light';
+  setTheme(theme);
+  const sens = parseInt(localStorage.getItem('snake_touch_sens') || '40',10);
+  if (app.elements.touchSensitivity) app.elements.touchSensitivity.value = sens;
+  app.game.touchSensitivity = sens;
+  const aiDiff = localStorage.getItem('snake_ai_diff') || 'normal';
+  if (app.elements.aiDifficulty) app.elements.aiDifficulty.value = aiDiff;
+  app.game.aiDifficulty = aiDiff;
+}
+function loadSettingsIntoUI(){
+  loadSettings();
+}
+function saveSettings(){
+  const sens = parseInt(app.elements.touchSensitivity.value,10) || 40;
+  localStorage.setItem('snake_touch_sens', String(sens)); app.game.touchSensitivity = sens;
+  const ai = app.elements.aiDifficulty.value || 'normal'; localStorage.setItem('snake_ai_diff', ai); app.game.aiDifficulty = ai;
+  alert('Settings saved');
+  navigateTo('home');
+}
+
+// === Helper: powerup cleanup interval ===
+setInterval(()=> {
   const now = Date.now();
-  gameState.powerups = gameState.powerups.filter(p => (now - p.createdAt) < 35000);
+  app.game.powerups = app.game.powerups.filter(p => (now - p.createdAt) < 35000);
 }, 5000);
 
-/* --- Check & revert active power exposure in UI each frame --- */
-setInterval(()=>{
-  if (gameState.activePower && Date.now() > gameState.activePower.expiresAt){
-    // revert handled by timer; here we just clear HUD if expired
-    if (!gameState.activePower) elements.hudActive.textContent = '';
-  }
-}, 500);
+// === Utility small helpers ===
+function playBite(){ playTone(900,0.06,'square',0,0.08); playTone(1400,0.05,'sawtooth',0.02,0.05); }
+function playCrash(){ playTone(120,0.35,'sine',0,0.28); }
+function playTone(freq,dur=0.08,type='sine',when=0,gain=0.12){ try{ ensureAudio(); const ctx = app.game.audioCtx; const o = ctx.createOscillator(); const g = ctx.createGain(); o.type=type; o.frequency.value=freq; o.connect(g); g.connect(ctx.destination); g.gain.value=gain; o.start(ctx.currentTime+when); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+when+dur); o.stop(ctx.currentTime+when+dur+0.02); }catch(e){} }
+function ensureAudio(){ try{ if(!app.game.audioCtx) app.game.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){} }
 
-/* --- Draw + game start --- */
-document.addEventListener('DOMContentLoaded', ()=>initGame());
-
-/* --- Helper: play small tone used above --- */
-function playTone(freq, duration=0.08, type='sine', when=0, gain=0.12){
-  try {
-    ensureAudio();
-    const ctx = gameState.audioCtx;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = type; o.frequency.value = freq;
-    o.connect(g); g.connect(ctx.destination);
-    g.gain.value = gain;
-    o.start(ctx.currentTime + when);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + when + duration);
-    o.stop(ctx.currentTime + when + duration + 0.02);
-  } catch(e){ /* ignore */ }
+// === Small helpers to expose start/reset for menu buttons ===
+function startGame(){ showView('play'); startGameInternal(); }
+function startGameInternal(){
+  if (app.game.running && !app.game.paused) return;
+  ensureAudio();
+  app.game.snake = [{x:10,y:10}];
+  app.game.aiSnake = app.game.mode==='vs' ? [{x:15,y:15}] : [];
+  app.game.direction = app.game.mode==='ai' ? {x:1,y:0} : {x:0,y:0};
+  app.game.score=0; app.game.level=1; app.game.speed=CONFIG.INITIAL_SPEED; app.game.running=true; app.game.paused=false;
+  generateFood();
+  app.game.powerups = [];
+  app.game.loop = setInterval(gameStep, app.game.speed);
+  app.elements.gameStatus.style.opacity = '0';
 }
+function restartGame(){ clearInterval(app.game.loop); app.game.running=false; app.game.paused=false; app.game.snake = [{x:10,y:10}]; app.game.aiSnake = []; app.game.direction={x:0,y:0}; app.game.score=0; app.game.level=1; app.game.speed=CONFIG.INITIAL_SPEED; app.game.powerups=[]; app.elements.hudActive.textContent=''; draw(); }
+function togglePause(){ if (!app.game.running) return; app.game.paused = !app.game.paused; if (app.game.paused) clearInterval(app.game.loop); else app.game.loop = setInterval(gameStep, app.game.speed); }
 
-/* --- End of file --- */
-        
+// Expose some functions to global for button callbacks
+window.startGame = startGameInternal;
+window.resetGame = restartGame;
+window.closeGameOver = closeGameOver;
+
+// End of file
