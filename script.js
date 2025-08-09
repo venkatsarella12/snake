@@ -72,6 +72,38 @@ function cacheElements(){
   app.elements.playButton = $('#playNow');
 }
 
+// === Home Screen Button Animation ===
+document.addEventListener("DOMContentLoaded", () => {
+    const buttons = document.querySelectorAll(".menu-btn");
+    buttons.forEach((btn, index) => {
+        btn.style.opacity = "0";
+        btn.style.transform = "translateY(20px)";
+        setTimeout(() => {
+            btn.style.transition = "opacity 0.5s ease, transform 0.5s ease";
+            btn.style.opacity = "1";
+            btn.style.transform = "translateY(0)";
+        }, 200 * index); // Staggered animation
+    });
+
+    // Add ripple effect to buttons
+    buttons.forEach(btn => {
+        btn.addEventListener("click", function (e) {
+            const ripple = document.createElement("span");
+            ripple.classList.add("ripple");
+            this.appendChild(ripple);
+
+            let x = e.clientX - e.target.getBoundingClientRect().left;
+            let y = e.clientY - e.target.getBoundingClientRect().top;
+
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        });
+    });
+});
 /* Wire UI events */
 function wireUI(){
   // Menu toggles
