@@ -1,240 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Responsive Snake Game</title>
-  <style>
-    body {
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-    }
-
-    h1 {
-      margin: 15px 0;
-    }
-
-    canvas {
-      background: black;
-      border: 3px solid white;
-      display: block;
-      margin: 0 auto;
-      max-width: 90vw;
-      height: auto;
-    }
-
-    #controls {
-      margin: 15px 0;
-    }
-
-    button, select {
-      padding: 10px 15px;
-      margin: 5px;
-      border: none;
-      border-radius: 5px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    #scoreDisplay {
-      margin-top: 10px;
-      font-size: 18px;
-    }
-
-    .arrows {
-      margin-top: 20px;
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .arrow-btn {
-      background: #444;
-      color: white;
-      font-size: 24px;
-      padding: 15px;
-      border-radius: 50%;
-      width: 60px;
-      height: 60px;
-      border: 2px solid white;
-      user-select: none;
-    }
-
-    .arrow-grid {
-      display: grid;
-      grid-template-columns: 60px 60px 60px;
-      grid-template-rows: 60px 60px 60px;
-      gap: 10px;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .empty {
-      visibility: hidden;
-    }
-
-    @media (max-width: 480px) {
-      .arrow-btn {
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
-      }
-    }
-  </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🐍 Classic Snake Arcade</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Orbitron for headings + Press Start 2P for retro text -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-
-<h1>Snake Game</h1>
-
-<canvas id="gameCanvas" width="400" height="400"></canvas>
-
-<div id="controls">
-  <button onclick="startGame()">Start</button>
-  <button onclick="pauseGame()">Pause</button>
-  <button onclick="resetGame()">Reset</button>
-  <select id="speedSelect" onchange="changeSpeed(this.value)">
-    <option value="150">Slow</option>
-    <option value="100" selected>Medium</option>
-    <option value="60">Fast</option>
-  </select>
-</div>
-
-<div id="scoreDisplay">Score: 0</div>
-
-<div class="arrows">
-  <div class="arrow-grid">
-    <div class="empty"></div>
-    <div class="arrow-btn" onclick="setDirection('UP')">⬆️</div>
-    <div class="empty"></div>
-
-    <div class="arrow-btn" onclick="setDirection('LEFT')">⬅️</div>
-    <div class="empty"></div>
-    <div class="arrow-btn" onclick="setDirection('RIGHT')">➡️</div>
-
-    <div class="empty"></div>
-    <div class="arrow-btn" onclick="setDirection('DOWN')">⬇️</div>
-    <div class="empty"></div>
+  <div class="bg-animation" aria-hidden="true">
+    <div class="snake-bg snake-bg-1"></div>
+    <div class="snake-bg snake-bg-2"></div>
+    <div class="snake-bg snake-bg-3"></div>
   </div>
-</div>
+  <div class="scanlines" aria-hidden="true"></div>
 
-<script>
-  const canvas = document.getElementById("gameCanvas");
-  const ctx = canvas.getContext("2d");
+  <div class="arcade-container">
+    <header class="game-header">
+      <h1 class="neon-title">
+        <span class="snake-icon" aria-hidden="true">🐍</span>
+        SNAKE
+        <span class="arcade-text">ARCADE</span>
+      </h1>
+      <div class="subtitle">CLASSIC RETRO GAMING EXPERIENCE</div>
+    </header>
 
-  const box = 20;
-  let snake = [{ x: 200, y: 200 }];
-  let food = { x: 100, y: 100 };
-  let direction = "RIGHT";
-  let score = 0;
-  let gameInterval;
-  let speed = 100;
-  let isRunning = false;
+    <div class="game-panel">
+      <!-- Controls -->
+      <div class="control-panel" aria-label="Controls">
+        <div class="panel-section">
+          <h3 class="panel-title">GAME MODE</h3>
+          <div class="mode-selector" role="toolbar" aria-label="Game modes">
+            <button class="retro-btn mode-btn active animated-btn" data-mode="human" aria-pressed="true"> <span class="btn-light"></span> PLAYER </button>
+            <button class="retro-btn mode-btn animated-btn" data-mode="ai" aria-pressed="false"> <span class="btn-light"></span> AI DEMO </button>
+            <button class="retro-btn mode-btn animated-btn" data-mode="vs" aria-pressed="false"> <span class="btn-light"></span> VS AI </button>
+          </div>
+        </div>
 
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
-    if (e.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
-    if (e.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
-    if (e.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
-  });
+        <div class="panel-section">
+          <h3 class="panel-title">CONTROLS</h3>
+          <div class="game-controls">
+            <button class="retro-btn control-btn animated-btn" id="startBtn" aria-label="Start game"> <span class="btn-light"></span> START </button>
+            <button class="retro-btn control-btn animated-btn" id="pauseBtn" disabled aria-label="Pause game"> <span class="btn-light"></span> PAUSE </button>
+            <button class="retro-btn control-btn animated-btn" id="resetBtn" aria-label="Reset game"> <span class="btn-light"></span> RESET </button>
+          </div>
+        </div>
 
-  function setDirection(dir) {
-    if (dir === "UP" && direction !== "DOWN") direction = "UP";
-    if (dir === "DOWN" && direction !== "UP") direction = "DOWN";
-    if (dir === "LEFT" && direction !== "RIGHT") direction = "LEFT";
-    if (dir === "RIGHT" && direction !== "LEFT") direction = "RIGHT";
-  }
+        <div class="panel-section">
+          <h3 class="panel-title">STATS</h3>
+          <div class="stats-display" aria-live="polite">
+            <div class="stat-item">
+              <div class="stat-label">SCORE</div>
+              <div class="stat-value" id="score">000000</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">HIGH</div>
+              <div class="stat-value" id="highScore">000000</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">LEVEL</div>
+              <div class="stat-value" id="level">001</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">MODE</div>
+              <div class="stat-mode" id="gameMode">HUMAN</div>
+            </div>
+          </div>
+        </div>
 
-  function drawGame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+        <div class="panel-section">
+          <h3 class="panel-title">INSTRUCTIONS</h3>
+          <div class="instructions">
+            <div class="instruction-line"><span class="key">↑↓←→</span> MOVE</div>
+            <div class="instruction-line"><span class="key">SPACE</span> START / PAUSE</div>
+            <div class="instruction-line"><span class="key">R</span> RESTART</div>
+          </div>
+        </div>
+      </div>
 
-    // Draw snake
-    snake.forEach((segment, index) => {
-      ctx.fillStyle = index === 0 ? "#00FF00" : "#00AA00";
-      ctx.fillRect(segment.x, segment.y, box, box);
-    });
+      <!-- Game Area -->
+      <div class="game-area" role="main" aria-label="Game screen">
+        <div class="screen-bezel">
+          <div class="screen-inner">
+            <canvas id="gameCanvas" width="480" height="480" role="img" aria-label="Snake game canvas"></canvas>
 
-    // Draw food
-    ctx.fillStyle = "red";
-    ctx.fillRect(food.x, food.y, box, box);
+            <div class="game-overlay" id="gameStatus" aria-hidden="false">
+              <div class="status-text">PRESS START TO BEGIN</div>
+              <div class="snake-animation" aria-hidden="true">
+                <div class="animated-snake">
+                  <div class="snake-segment head"></div>
+                  <div class="snake-segment"></div>
+                  <div class="snake-segment"></div>
+                  <div class="snake-segment"></div>
+                  <div class="snake-segment tail"></div>
+                </div>
+              </div>
+            </div>
 
-    let headX = snake[0].x;
-    let headY = snake[0].y;
+            <!-- small HUD overlay for power-up active -->
+            <div class="hud" id="hud">
+              <div class="power-active" id="activePower" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    if (direction === "UP") headY -= box;
-    if (direction === "DOWN") headY += box;
-    if (direction === "LEFT") headX -= box;
-    if (direction === "RIGHT") headX += box;
+      <!-- Info -->
+      <div class="info-panel" aria-label="Information">
+        <div class="panel-section">
+          <h3 class="panel-title">NEXT LEVEL</h3>
+          <div class="progress-container">
+            <div class="progress-bar" aria-hidden="true">
+              <div class="progress-fill" id="levelProgress"></div>
+            </div>
+            <div class="progress-text" id="progressText">0/100</div>
+          </div>
+        </div>
 
-    if (headX < 0 || headX >= canvas.width || headY < 0 || headY >= canvas.height) {
-      gameOver();
-      return;
-    }
+        <div class="panel-section">
+          <h3 class="panel-title">POWER-UPS</h3>
+          <div class="powerup-list">
+            <div class="powerup-item"><span class="powerup-icon">🍎</span><span class="powerup-name">FOOD</span><span class="powerup-points">+10</span></div>
+            <div class="powerup-item"><span class="powerup-icon">⚡</span><span class="powerup-name">SPEED BOOST</span><span class="powerup-points">TEMP</span></div>
+            <div class="powerup-item"><span class="powerup-icon">💎</span><span class="powerup-name">BONUS GEM</span><span class="powerup-points">+50</span></div>
+            <div class="powerup-item"><span class="powerup-icon">🐌</span><span class="powerup-name">SLOW DOWN</span><span class="powerup-points">TEMP</span></div>
+          </div>
+        </div>
 
-    for (let i = 1; i < snake.length; i++) {
-      if (headX === snake[i].x && headY === snake[i].y) {
-        gameOver();
-        return;
-      }
-    }
+        <div class="panel-section">
+          <h3 class="panel-title">ACHIEVEMENTS</h3>
+          <div class="achievement-list">
+            <div class="achievement-item unlocked"><span class="achievement-icon">🏆</span><span class="achievement-name">FIRST BITE</span></div>
+            <div class="achievement-item locked"><span class="achievement-icon">🎯</span><span class="achievement-name">SCORE 100</span></div>
+            <div class="achievement-item locked"><span class="achievement-icon">🔥</span><span class="achievement-name">MASTER</span></div>
+          </div>
+        </div>
 
-    if (headX === food.x && headY === food.y) {
-      score++;
-      document.getElementById("scoreDisplay").innerText = "Score: " + score;
-      food = {
-        x: Math.floor(Math.random() * (canvas.width / box)) * box,
-        y: Math.floor(Math.random() * (canvas.height / box)) * box
-      };
-    } else {
-      snake.pop();
-    }
+        <div class="panel-section">
+          <h3 class="panel-title">AI STATUS</h3>
+          <div class="ai-status" id="aiStatus">
+            <div class="ai-brain" aria-hidden="true">
+              <div class="brain-wave"></div>
+              <div class="brain-wave"></div>
+              <div class="brain-wave"></div>
+            </div>
+            <div class="ai-text">STANDBY</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-    let newHead = { x: headX, y: headY };
-    snake.unshift(newHead);
-  }
+    <footer class="game-footer">
+      <div class="footer-text">© 2025 CLASSIC SNAKE ARCADE • BUILT WITH ❤️ FOR RETRO GAMING</div>
+    </footer>
+  </div>
 
-  function startGame() {
-    if (!isRunning) {
-      gameInterval = setInterval(drawGame, speed);
-      isRunning = true;
-    }
-  }
+  <div class="modal-overlay" id="gameOverModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-content retro-modal">
+      <div class="modal-header"><h2 class="modal-title" id="gameOverTitle">GAME OVER</h2></div>
+      <div class="modal-body">
+        <div class="final-score">
+          <div class="score-label">FINAL SCORE</div>
+          <div class="score-number" id="gameOverScore">000000</div>
+        </div>
+        <div class="game-message" id="gameOverMessage">TRY AGAIN TO BEAT YOUR HIGH SCORE!</div>
+      </div>
+      <div class="modal-footer">
+        <button class="retro-btn modal-btn animated-btn" onclick="closeGameOver(); startGame();"><span class="btn-light"></span> PLAY AGAIN</button>
+        <button class="retro-btn modal-btn animated-btn" onclick="closeGameOver();"><span class="btn-light"></span> MAIN MENU</button>
+      </div>
+    </div>
+  </div>
 
-  function pauseGame() {
-    clearInterval(gameInterval);
-    isRunning = false;
-  }
-
-  function resetGame() {
-    pauseGame();
-    snake = [{ x: 200, y: 200 }];
-    food = { x: 100, y: 100 };
-    direction = "RIGHT";
-    score = 0;
-    document.getElementById("scoreDisplay").innerText = "Score: 0";
-    drawGame();
-  }
-
-  function gameOver() {
-    pauseGame();
-    alert("Game Over! Final Score: " + score);
-    resetGame();
-  }
-
-  function changeSpeed(newSpeed) {
-    speed = parseInt(newSpeed);
-    if (isRunning) {
-      pauseGame();
-      startGame();
-    }
-  }
-
-  drawGame(); // Initial draw
-</script>
-
+  <script src="script.js"></script>
 </body>
-</html>
+              </html>
