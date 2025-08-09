@@ -30,24 +30,19 @@
       </nav>
     </header>
 
-    <!-- Views container: home / play / settings / tools -->
-    <main id="views">
-      <!-- HOME VIEW -->
-      <section class="view view-home" data-view="home">
-        <div class="home-card">
-          <h2>Welcome</h2>
-          <p>Play classic Snake with power-ups, AI demo, and VS mode. Touch, keyboard, or drag controls.</p>
-          <div class="home-actions">
-            <button class="btn primary" id="playNow">Play Now</button>
-            <button class="btn" id="openSettings">Settings</button>
-            <button class="btn" id="openTools">Tools</button>
-          </div>
-          <div class="home-info">
-            <div class="info-block"><strong>Mobile Tip</strong><span>Swipe or drag on the screen to steer.</span></div>
-            <div class="info-block"><strong>Desktop Tip</strong><span>Use arrow keys or WASD.</span></div>
-          </div>
-        </div>
-      </section>
+    <!-- Home Screen Section -->
+<section id="home-screen" class="home-screen">
+  <div class="logo-container">
+    <img src="assets/guitar-logo.png" alt="Guitar Snake Game" class="logo">
+    <h1 class="game-title">Snake Strings</h1>
+  </div>
+  
+  <div class="menu-buttons">
+    <button class="menu-btn play-btn">🎸 Play</button>
+    <button class="menu-btn settings-btn">⚙ Settings</button>
+    <button class="menu-btn info-btn">ℹ Info</button>
+  </div>
+</section>
 
       <!-- PLAY VIEW (game + minimal UI) -->
       <section class="view view-play" data-view="play" aria-hidden="true">
