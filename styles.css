@@ -42,56 +42,82 @@ body{
 /* Views container */
 #views{max-width:1200px;margin:18px auto;padding:0 16px}
 
-/* HOME */
-.view{display:none;padding:18px}
-.view-home{display:flex;justify-content:center}
-.home-card{width:100%;max-width:880px;background:var(--panel);border-radius:16px;padding:28px;box-shadow:var(--shadow)}
-.home-actions{display:flex;gap:12px;margin-top:18px}
-.info-block{margin-top:14px;padding:12px;background:var(--glass);border-radius:10px;color:var(--muted)}
+/* Home Screen */
+.home-screen {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #f4f1de, #e07a5f);
+  color: #333;
+  font-family: 'Poppins', sans-serif;
+  text-align: center;
+}
 
-/* PLAY */
-.view-play{display:none;align-items:center;justify-content:center;padding:12px}
-.play-wrapper{display:flex;justify-content:center}
-.screen-bezel{background:linear-gradient(180deg, rgba(255,255,255,0.75), rgba(255,255,255,0.95)); padding:18px;border-radius:18px;box-shadow:var(--shadow); border:1px solid rgba(0,0,0,0.04)}
-body.dark-mode .screen-bezel{background:var(--panel)}
-.screen-inner{background:#000;border-radius:12px;overflow:hidden;position:relative; width: min(92vw, 560px)}
-#gameCanvas{display:block;width:100%;height:auto;max-width:560px; background:#000}
+.logo-container {
+  animation: fadeInDown 1s ease;
+}
 
-/* HUD */
-.game-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.status-text{color:#e8ffdd;background:linear-gradient(90deg,#004e00,#00b894);padding:10px 14px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.4)}
-.hud {position:absolute;left:12px;top:12px;background:rgba(0,0,0,0.45);color:#fff;padding:6px 10px;border-radius:8px;font-size:0.78rem}
+.logo {
+  width: 120px;
+  height: auto;
+  margin-bottom: 10px;
+}
 
-/* in-play controls */
-.inplay-controls{position:fixed;bottom:18px;right:18px;display:flex;gap:8px;z-index:50}
+.game-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #3d405b;
+}
 
-/* Buttons */
-.btn{border:0;padding:10px 14px;border-radius:10px;background:var(--panel);box-shadow:var(--shadow);cursor:pointer}
-.btn.primary{background:linear-gradient(90deg,var(--accent-2),var(--accent));color:#fff;font-weight:700}
-.btn.small{padding:6px 10px;font-size:0.82rem}
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 30px;
+}
 
-/* menu */
-.side-menu{position:fixed;top:0;right:-360px;width:320px;height:100%;background:var(--panel);box-shadow: -18px 0 60px rgba(0,0,0,0.15);transition:right .28s ease;padding:18px;z-index:120}
-.side-menu.open{right:12px}
-.menu-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.menu-list{display:flex;flex-direction:column;gap:8px}
-.menu-item{border:0;text-align:left;padding:12px;border-radius:8px;background:var(--glass);cursor:pointer}
+.menu-btn {
+  padding: 15px 40px;
+  border: none;
+  border-radius: 50px;
+  background-color: #81b29a;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
 
-/* modal */
-.modal-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:200}
-.modal-overlay.show{display:flex}
-.modal-content{background:var(--panel);padding:20px;border-radius:12px;box-shadow:var(--shadow)}
+.menu-btn:hover {
+  background-color: #f2cc8f;
+  transform: scale(1.05);
+}
 
-/* settings/tools */
-.panel{max-width:720px;margin:0 auto;background:var(--panel);padding:20px;border-radius:12px;box-shadow:var(--shadow)}
-.setting-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed rgba(0,0,0,0.03)}
-.setting-controls{display:flex;gap:8px}
+.play-btn {
+  background: #e07a5f;
+}
 
-/* D-pad for touch */
-.touch-dpad{position:absolute;right:12px;bottom:12px;display:none;z-index:60;user-select:none}
-.dpad-btn{width:48px;height:48px;border-radius:10px;background:var(--panel);box-shadow:var(--shadow);border:0;margin:6px;cursor:pointer}
-.dpad-row{display:flex;justify-content:center;align-items:center}
+.settings-btn {
+  background: #3d405b;
+}
 
+.info-btn {
+  background: #81b29a;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 /* responsive - show dpad on small screens */
 @media (max-width:800px){
   .view-home{padding:12px}
