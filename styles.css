@@ -1,46 +1,77 @@
-/* styles.css - Updated UI: light-first theme, responsive, animated buttons */
+/* styles.css - Finalized for Snake Arcade */
 
-/* Variables for light theme - JS toggles body.dark-mode to invert palette */
-:root{
-  --bg:#f5f8fa; --panel:#ffffff; --muted:#6b7280; --accent:#ff6b00;
-  --primary:#0f172a; --accent-2:#00b894; --glass: rgba(2,6,23,0.04);
+/* Theme variables and toggling via body.dark-mode */
+:root {
+  --bg: #f5f8fa;
+  --panel: #ffffff;
+  --muted: #6b7280;
+  --accent: #ff6b00;
+  --primary: #0f172a;
+  --accent-2: #00b894;
+  --glass: rgba(2,6,23,0.04);
   --shadow: 0 8px 30px rgba(2,6,23,0.06);
 }
-body.dark-mode{
-  --bg:#07070a; --panel: linear-gradient(180deg,#0f1220,#05060a); --muted:#9aa6b2;
-  --accent:#ffd166; --primary:#dfffe0; --accent-2:#8a6cff; --glass: rgba(255,255,255,0.03);
+body.dark-mode {
+  --bg: #07070a;
+  --panel: linear-gradient(180deg,#0f1220,#05060a);
+  --muted: #9aa6b2;
+  --accent: #ffd166;
+  --primary: #dfffe0;
+  --accent-2: #8a6cff;
+  --glass: rgba(255,255,255,0.03);
   --shadow: 0 10px 40px rgba(0,0,0,0.6);
 }
 
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;
-  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: radial-gradient(circle at 10% 20%, #eef6ff 0%, var(--bg) 40%);
-  color:var(--primary);
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
+  color: var(--primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.4s ease, color 0.3s ease;
 }
 
-/* App shell */
-.app-header{
-  display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:transparent;
+/* App header */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: transparent;
 }
-.brand{display:flex;gap:12px;align-items:center}
-.logo{font-size:28px}
-.title{font-weight:700;font-family: 'Orbitron', sans-serif;font-size:1.25rem}
-.subtitle.small{font-size:.72rem;color:var(--muted)}
-
-/* Top icons */
-.icon-btn{
-  background:var(--panel);border:0;padding:8px 10px;border-radius:10px;box-shadow:var(--shadow);cursor:pointer;
-  transition:transform .15s ease, box-shadow .2s ease;
+.brand {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
-.icon-btn:active{transform:translateY(2px)}
+.logo { font-size: 28px; }
+.title {
+  font-weight: 700;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1.25rem;
+}
+.subtitle.small {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
 
-/* Views container */
-#views{max-width:1200px;margin:18px auto;padding:0 16px}
+/* Buttons */
+.icon-btn, .btn, .menu-item {
+  background: var(--panel);
+  border: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.icon-btn:active, .btn:active, .menu-item:active { transform: translateY(2px); }
+.icon-btn:focus, .btn:focus, .menu-item:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 
 /* Home Screen */
 .home-screen {
@@ -55,16 +86,13 @@ body{
   text-align: center;
 }
 
-.logo-container {
-  animation: fadeInDown 1s ease;
-}
-
-.logo {
+.logo-container { animation: fadeInDown 1s ease; }
+.logo-container img.logo {
   width: 120px;
+  max-width: 80vw;
   height: auto;
   margin-bottom: 10px;
 }
-
 .game-title {
   font-size: 2.5rem;
   font-weight: bold;
@@ -77,83 +105,69 @@ body{
   gap: 15px;
   margin-top: 30px;
 }
-
 .menu-btn {
+  position: relative;
+  overflow: hidden;
   padding: 15px 40px;
-  border: none;
   border-radius: 50px;
-  background-color: #81b29a;
-  color: white;
   font-size: 1.2rem;
-  cursor: pointer;
   font-weight: 600;
+  color: white;
   transition: all 0.3s ease;
 }
-.menu-btn {
-    position: relative;
-    overflow: hidden;
+.play-btn { background: #e07a5f; }
+.settings-btn { background: #3d405b; }
+.info-btn { background: #81b29a; }
+
+.menu-btn:hover {
+  transform: scale(1.05);
+}
+.menu-btn:hover:not(.rippleing) { /* to avoid conflict with ripple effect */
+  background-color: #f2cc8f;
 }
 
 .ripple {
-    position: absolute;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.6);
-    transform: scale(0);
-    animation: ripple 0.6s linear;
-    pointer-events: none;
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(0);
+  animation: ripple 0.6s linear;
+  pointer-events: none;
 }
 
 @keyframes ripple {
-    to {
-        transform: scale(4);
-        opacity: 0;
-    }
-}
-
-.menu-btn:hover {
-  background-color: #f2cc8f;
-  transform: scale(1.05);
-}
-
-.play-btn {
-  background: #e07a5f;
-}
-
-.settings-btn {
-  background: #3d405b;
-}
-
-.info-btn {
-  background: #81b29a;
-}
-
-/* Animations */
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
   to {
-    opacity: 1;
-    transform: translateY(0);
+    transform: scale(4);
+    opacity: 0;
   }
 }
-/* responsive - show dpad on small screens */
-@media (max-width:800px){
-  .view-home{padding:12px}
-  .touch-dpad{display:block}
-  .inplay-controls{right:12px;bottom:80px}
-  .app-header{padding:10px}
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* footer */
-.app-footer{text-align:center;padding:14px;color:var(--muted);font-size:0.85rem}
+/* Responsive layout */
+@media (max-width: 800px) {
+  .view-home { padding: 12px; }
+  .touch-dpad { display: block; }
+  .inplay-controls { right: 12px; bottom: 80px; }
+  .app-header { padding: 10px; }
+}
 
-/* small polished transitions */
-.btn, .menu-item, .icon-btn{transition:transform .15s ease, box-shadow .2s ease}
-.btn:active, .menu-item:active{transform:translateY(2px)}
+/* Footer */
+.app-footer {
+  text-align: center;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 
-/* accessibility reduced motion */
-@media (prefers-reduced-motion: reduce){
-  *{transition:none!important;animation:none!important}
+/* Reduce motion mode */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
 }
