@@ -2,179 +2,170 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>🐍 Classic Snake Arcade</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Snake Arcade — Play Anywhere</title>
   <link rel="stylesheet" href="styles.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- Orbitron for headings + Press Start 2P for retro text -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&family=Orbitron:wght@600;900&display=swap" rel="stylesheet">
 </head>
-<body>
-  <div class="bg-animation" aria-hidden="true">
-    <div class="snake-bg snake-bg-1"></div>
-    <div class="snake-bg snake-bg-2"></div>
-    <div class="snake-bg snake-bg-3"></div>
-  </div>
-  <div class="scanlines" aria-hidden="true"></div>
+<body class="light-mode">
+  <div id="app">
+    <!-- Background graphics -->
+    <div class="bg-graphic" aria-hidden="true"></div>
 
-  <div class="arcade-container">
-    <header class="game-header">
-      <h1 class="neon-title">
-        <span class="snake-icon" aria-hidden="true">🐍</span>
-        SNAKE
-        <span class="arcade-text">ARCADE</span>
-      </h1>
-      <div class="subtitle">CLASSIC RETRO GAMING EXPERIENCE</div>
-    </header>
-
-    <div class="game-panel">
-      <!-- Controls -->
-      <div class="control-panel" aria-label="Controls">
-        <div class="panel-section">
-          <h3 class="panel-title">GAME MODE</h3>
-          <div class="mode-selector" role="toolbar" aria-label="Game modes">
-            <button class="retro-btn mode-btn active animated-btn" data-mode="human" aria-pressed="true"> <span class="btn-light"></span> PLAYER </button>
-            <button class="retro-btn mode-btn animated-btn" data-mode="ai" aria-pressed="false"> <span class="btn-light"></span> AI DEMO </button>
-            <button class="retro-btn mode-btn animated-btn" data-mode="vs" aria-pressed="false"> <span class="btn-light"></span> VS AI </button>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">CONTROLS</h3>
-          <div class="game-controls">
-            <button class="retro-btn control-btn animated-btn" id="startBtn" aria-label="Start game"> <span class="btn-light"></span> START </button>
-            <button class="retro-btn control-btn animated-btn" id="pauseBtn" disabled aria-label="Pause game"> <span class="btn-light"></span> PAUSE </button>
-            <button class="retro-btn control-btn animated-btn" id="resetBtn" aria-label="Reset game"> <span class="btn-light"></span> RESET </button>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">STATS</h3>
-          <div class="stats-display" aria-live="polite">
-            <div class="stat-item">
-              <div class="stat-label">SCORE</div>
-              <div class="stat-value" id="score">000000</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">HIGH</div>
-              <div class="stat-value" id="highScore">000000</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">LEVEL</div>
-              <div class="stat-value" id="level">001</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-label">MODE</div>
-              <div class="stat-mode" id="gameMode">HUMAN</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">INSTRUCTIONS</h3>
-          <div class="instructions">
-            <div class="instruction-line"><span class="key">↑↓←→</span> MOVE</div>
-            <div class="instruction-line"><span class="key">SPACE</span> START / PAUSE</div>
-            <div class="instruction-line"><span class="key">R</span> RESTART</div>
-          </div>
+    <!-- App Shell -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">🐍</div>
+        <div>
+          <div class="title">Snake Arcade</div>
+          <div class="subtitle small">Retro, polished, playable everywhere</div>
         </div>
       </div>
 
-      <!-- Game Area -->
-      <div class="game-area" role="main" aria-label="Game screen">
-        <div class="screen-bezel">
-          <div class="screen-inner">
-            <canvas id="gameCanvas" width="480" height="480" role="img" aria-label="Snake game canvas"></canvas>
+      <nav class="top-controls">
+        <button id="btnMenu" class="icon-btn" aria-label="Open menu">☰</button>
+        <button id="toggleTheme" class="icon-btn" aria-label="Toggle theme">🌙</button>
+      </nav>
+    </header>
 
-            <div class="game-overlay" id="gameStatus" aria-hidden="false">
-              <div class="status-text">PRESS START TO BEGIN</div>
-              <div class="snake-animation" aria-hidden="true">
-                <div class="animated-snake">
-                  <div class="snake-segment head"></div>
-                  <div class="snake-segment"></div>
-                  <div class="snake-segment"></div>
-                  <div class="snake-segment"></div>
-                  <div class="snake-segment tail"></div>
+    <!-- Views container: home / play / settings / tools -->
+    <main id="views">
+      <!-- HOME VIEW -->
+      <section class="view view-home" data-view="home">
+        <div class="home-card">
+          <h2>Welcome</h2>
+          <p>Play classic Snake with power-ups, AI demo, and VS mode. Touch, keyboard, or drag controls.</p>
+          <div class="home-actions">
+            <button class="btn primary" id="playNow">Play Now</button>
+            <button class="btn" id="openSettings">Settings</button>
+            <button class="btn" id="openTools">Tools</button>
+          </div>
+          <div class="home-info">
+            <div class="info-block"><strong>Mobile Tip</strong><span>Swipe or drag on the screen to steer.</span></div>
+            <div class="info-block"><strong>Desktop Tip</strong><span>Use arrow keys or WASD.</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLAY VIEW (game + minimal UI) -->
+      <section class="view view-play" data-view="play" aria-hidden="true">
+        <div class="play-wrapper">
+          <div class="screen-bezel play-only">
+            <div class="screen-inner">
+              <canvas id="gameCanvas" width="480" height="480" aria-label="Snake game canvas"></canvas>
+
+              <!-- HUD overlays -->
+              <div class="game-overlay" id="gameStatus">
+                <div class="status-text">PRESS START TO BEGIN</div>
+              </div>
+
+              <div id="hudActive" class="hud power-active" aria-live="polite"></div>
+
+              <!-- small on-screen dpad for touch -->
+              <div class="touch-dpad" id="touchDpad">
+                <button data-dir="up" class="dpad-btn">▲</button>
+                <div class="dpad-row">
+                  <button data-dir="left" class="dpad-btn">◄</button>
+                  <button data-dir="down" class="dpad-btn">▼</button>
+                  <button data-dir="right" class="dpad-btn">►</button>
                 </div>
               </div>
             </div>
-
-            <!-- small HUD overlay for power-up active -->
-            <div class="hud" id="hud">
-              <div class="power-active" id="activePower" aria-live="polite"></div>
-            </div>
           </div>
         </div>
+
+        <!-- In-play minimized menu (hamburger opens full menu) -->
+        <div class="inplay-controls">
+          <button id="pauseBtn" class="btn small">Pause</button>
+          <button id="resetBtn" class="btn small">Reset</button>
+        </div>
+      </section>
+
+      <!-- SETTINGS VIEW -->
+      <section class="view view-settings" data-view="settings" aria-hidden="true">
+        <div class="panel">
+          <h3>Settings</h3>
+          <div class="setting-row">
+            <label>Theme</label>
+            <div class="setting-controls">
+              <button id="themeLight" class="btn">Light</button>
+              <button id="themeDark" class="btn">Dark</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <label>Touch Sensitivity</label>
+            <input id="touchSensitivity" type="range" min="10" max="100" value="40" />
+          </div>
+
+          <div class="setting-row">
+            <label>AI Difficulty</label>
+            <select id="aiDifficulty">
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+          </div>
+
+          <div class="setting-actions">
+            <button class="btn primary" id="saveSettings">Save</button>
+            <button class="btn" id="cancelSettings">Cancel</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TOOLS VIEW -->
+      <section class="view view-tools" data-view="tools" aria-hidden="true">
+        <div class="panel">
+          <h3>Tools & Info</h3>
+          <p>Here you can add leaderboards, skins, or export your score.</p>
+          <div class="tool-grid">
+            <button id="downloadScore" class="btn">Download Score</button>
+            <button id="toggleSounds" class="btn">Toggle Sounds</button>
+          </div>
+          <div class="setting-actions">
+            <button class="btn" id="backHome">Back</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Slide-out Menu (hamburger) -->
+    <aside id="sideMenu" class="side-menu" aria-hidden="true">
+      <div class="menu-header">
+        <strong>Menu</strong>
+        <button id="closeMenu" class="icon-btn">✕</button>
       </div>
+      <nav class="menu-list">
+        <button class="menu-item" data-nav="home">Home</button>
+        <button class="menu-item" data-nav="play">Play</button>
+        <button class="menu-item" data-nav="settings">Settings</button>
+        <button class="menu-item" data-nav="tools">Tools</button>
+        <hr />
+        <button id="menuRestart" class="menu-item">Restart Game</button>
+        <button id="menuToggleTheme" class="menu-item">Toggle Theme</button>
+      </nav>
+    </aside>
 
-      <!-- Info -->
-      <div class="info-panel" aria-label="Information">
-        <div class="panel-section">
-          <h3 class="panel-title">NEXT LEVEL</h3>
-          <div class="progress-container">
-            <div class="progress-bar" aria-hidden="true">
-              <div class="progress-fill" id="levelProgress"></div>
-            </div>
-            <div class="progress-text" id="progressText">0/100</div>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">POWER-UPS</h3>
-          <div class="powerup-list">
-            <div class="powerup-item"><span class="powerup-icon">🍎</span><span class="powerup-name">FOOD</span><span class="powerup-points">+10</span></div>
-            <div class="powerup-item"><span class="powerup-icon">⚡</span><span class="powerup-name">SPEED BOOST</span><span class="powerup-points">TEMP</span></div>
-            <div class="powerup-item"><span class="powerup-icon">💎</span><span class="powerup-name">BONUS GEM</span><span class="powerup-points">+50</span></div>
-            <div class="powerup-item"><span class="powerup-icon">🐌</span><span class="powerup-name">SLOW DOWN</span><span class="powerup-points">TEMP</span></div>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">ACHIEVEMENTS</h3>
-          <div class="achievement-list">
-            <div class="achievement-item unlocked"><span class="achievement-icon">🏆</span><span class="achievement-name">FIRST BITE</span></div>
-            <div class="achievement-item locked"><span class="achievement-icon">🎯</span><span class="achievement-name">SCORE 100</span></div>
-            <div class="achievement-item locked"><span class="achievement-icon">🔥</span><span class="achievement-name">MASTER</span></div>
-          </div>
-        </div>
-
-        <div class="panel-section">
-          <h3 class="panel-title">AI STATUS</h3>
-          <div class="ai-status" id="aiStatus">
-            <div class="ai-brain" aria-hidden="true">
-              <div class="brain-wave"></div>
-              <div class="brain-wave"></div>
-              <div class="brain-wave"></div>
-            </div>
-            <div class="ai-text">STANDBY</div>
-          </div>
+    <!-- Modal / Game Over -->
+    <div class="modal-overlay" id="gameOverModal" aria-hidden="true">
+      <div class="modal-content">
+        <h3>Game Over</h3>
+        <div class="score">Score <span id="gameOverScore">000000</span></div>
+        <div class="modal-actions">
+          <button class="btn primary" onclick="closeGameOver(); startGame();">Play Again</button>
+          <button class="btn" onclick="closeGameOver();">Main Menu</button>
         </div>
       </div>
     </div>
 
-    <footer class="game-footer">
-      <div class="footer-text">© 2025 CLASSIC SNAKE ARCADE • BUILT WITH ❤️ FOR RETRO GAMING</div>
+    <footer class="app-footer">
+      <div>© 2025 Snake Arcade • Play on any device</div>
     </footer>
-  </div>
-
-  <div class="modal-overlay" id="gameOverModal" role="dialog" aria-modal="true" aria-hidden="true">
-    <div class="modal-content retro-modal">
-      <div class="modal-header"><h2 class="modal-title" id="gameOverTitle">GAME OVER</h2></div>
-      <div class="modal-body">
-        <div class="final-score">
-          <div class="score-label">FINAL SCORE</div>
-          <div class="score-number" id="gameOverScore">000000</div>
-        </div>
-        <div class="game-message" id="gameOverMessage">TRY AGAIN TO BEAT YOUR HIGH SCORE!</div>
-      </div>
-      <div class="modal-footer">
-        <button class="retro-btn modal-btn animated-btn" onclick="closeGameOver(); startGame();"><span class="btn-light"></span> PLAY AGAIN</button>
-        <button class="retro-btn modal-btn animated-btn" onclick="closeGameOver();"><span class="btn-light"></span> MAIN MENU</button>
-      </div>
-    </div>
   </div>
 
   <script src="script.js"></script>
 </body>
-              </html>
+</html>
